@@ -24,3 +24,9 @@ Read `CONSTITUTION.md` before changing code.
 - Do not add hard-coded five-hour/weekly fields to `UsageSnapshot`.
 - Do not make an undocumented Codex endpoint or output shape a product guarantee.
 - Do not add abstractions for hypothetical v2 modules.
+
+
+## Documentation integration gate
+When a change affects installation, dependencies, runtime capabilities, validation status or Git workflow,
+update the user-facing `README.md` and the relevant normative/traceability documents in the same change.
+Repository use must not depend on chat/conversation history.

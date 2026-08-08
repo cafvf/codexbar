@@ -21,3 +21,26 @@
 | REQ-UI-002 | UC-UI-004 | AC-UI-009 | `tests/gui/test_tray_smoke.py::test_ac_ui_009_*` | `ui/tray.py::create_codexbar_icon` |
 | REQ-UI-002 | UC-UI-005 | AC-UI-010..013 | `tests/acceptance/test_req_ui_002.py` | `ui/viewmodel.py` |
 | REQ-UI-002 | UC-UI-005 | AC-UI-014 | target manual smoke + tooltip formatter tests | `ui/tray.py::_tooltip` |
+
+## REQ-UI-002 native indicator extension
+
+| Requirement | Use case / criteria | Implementation | Tests | Status |
+|---|---|---|---|---|
+| REQ-UI-002 | AC-UI-009..015 | `ui.viewmodel`, Qt tray | `test_req_ui_002.py`, GUI smoke | target Qt path validated |
+| REQ-UI-002 | AC-UI-016..019 | `ui.native_indicator`, `ui.tray` | `test_native_indicator.py`, `test_req_ui_002.py` | implemented; physical label validation pending |
+| REQ-UI-002 | AC-UI-020..024 | `ui.native_indicator`, `ui.native_indicator_helper`, ADR-003 | `test_native_indicator.py`, architecture tests | implemented; target helper validation pending |
+
+| REQ-UI-002 / UC-UI-007 | AC-UI-027..031 | `run_indicator_diagnostics`, helper `--diagnose`, CLI `--diagnose-indicator` | `tests/unit/test_native_indicator.py` | TASK-029E/F | ADR-003 |
+
+| REQ-UI-002 / UC-UI-007 | AC-UI-032..033 | `sanitized_native_environment`, all system-Python launch sites | `tests/unit/test_native_indicator.py` sanitizer/launch regression tests | TASK-029G | ADR-003 |
+
+
+## REQ-UI-002 supervision, diagnostics and environment isolation
+
+| Requirement | Criteria | Implementation | Tests | Status |
+|---|---|---|---|---|
+| REQ-UI-002 | AC-UI-025..026 | `ui.native_indicator`, `ui.tray` | native-helper supervision tests | validated |
+| REQ-UI-002 | AC-UI-027..031 | indicator diagnostic CLI/helper | diagnostic unit/CLI tests | validated |
+| REQ-UI-002 | AC-UI-032..033 | sanitized helper launcher environment | native environment sanitization tests | validated on target VS Code/Snap-contaminated launch path |
+
+Target evidence and limitations are recorded in `docs/VALIDATION.md`.

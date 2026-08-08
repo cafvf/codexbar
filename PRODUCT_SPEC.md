@@ -39,7 +39,22 @@ account management, credit purchasing, and prediction of future consumption.
 - Unknown source schema fails closed.
 - UI refresh must not block the GUI thread.
 - User-facing timestamps are localized; internal timestamps remain timezone-aware.
+- Optional distro-native desktop bindings SHALL NOT contaminate the uv-managed main environment; native Ayatana integration is isolated behind a system-Python helper and capability fallback.
+- No credentials or raw Codex provider payloads SHALL cross the native-helper IPC boundary.
 
 ## Risks
 The Codex usage surface may change independently of CodexBar. A CLI text parser is especially fragile;
 therefore source selection and fixture provenance are release gates rather than hidden assumptions.
+
+
+## Current validated baseline
+As of the REQ-UI-002 closeout:
+- real Codex usage retrieval is validated on the target Linux workstation;
+- adaptive Qt tray interaction is validated;
+- native Ayatana glance rendering is validated on Ubuntu/GNOME/Wayland with a sanitized system-Python helper;
+- Qt remains the mandatory fallback when the native helper is unavailable or unhealthy;
+- source-based use through `uv` is supported and documented;
+- system-wide installation, `.desktop`, autostart and uninstall remain future work under REQ-DESKTOP-001.
+
+A new user cloning the repository SHALL be able to discover the supported source-based setup from
+`README.md` without relying on conversation history.

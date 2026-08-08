@@ -1,77 +1,129 @@
 # CodexBar
 
-Specification-first Linux monitor for Codex usage limits.
+CodexBar is a Linux tray application that reads Codex usage/rate-limit information from the locally
+authenticated Codex app-server and presents the remaining quota at a glance.
 
-## Current state
-REQ-USAGE-001 is implemented and has been validated against an authenticated Codex installation on the
-target Linux workstation. REQ-UI-001 now provides the first PySide6 system-tray implementation; its
-controller tests are green and its target-desktop Qt validation is the next gate.
+## Current project status
 
-## Requirements
-- Python 3.12+
-- `uv` recommended for development
-- Codex CLI installed and authenticated for real usage reads
-- PySide6 only when using the tray UI
+Validated on the target Ubuntu/GNOME/Wayland workstation:
 
-## Setup with uv
-Core + development tests:
+- `REQ-USAGE-001` — real Codex usage provider: **validated**.
+- `REQ-UI-001` — adaptive Linux tray interaction: **validated**.
+- `REQ-UI-002` — project-owned icon, glanceable quota presentation, Ayatana native label and Qt fallback: **validated**.
+- `REQ-DESKTOP-001` — installable desktop integration/autostart/packaging: **not implemented yet**.
+
+The current development version is usable from a cloned repository. A system-wide/end-user installer is
+planned under `REQ-DESKTOP-001`.
+
+## Prerequisites
+
+Required:
+
+- Linux;
+- a working local Codex installation already authenticated;
+- Python compatible with the version declared in `pyproject.toml`;
+- [uv](https://docs.astral.sh/uv/).
+
+GUI:
+
+- PySide6 is installed by the `gui` extra.
+
+Optional native adjacent-label backend on Debian/Ubuntu-family systems:
 
 ```bash
-uv sync --extra dev
+sudo apt update
+sudo apt install python3-gi gir1.2-ayatanaappindicator3-0.1 gir1.2-gtk-3.0
 ```
 
-Tray UI + development tests:
+PyGObject is intentionally **not** installed into the uv environment. The Ayatana integration runs in a
+small helper using `/usr/bin/python3` and distro-provided `gi` bindings. See
+`docs/adr/ADR-003-native-indicator-helper.md`.
+
+## Clone and run
 
 ```bash
-uv sync --extra dev --extra gui
-```
+git clone <repository-url>
+cd codexbar
 
-## Run
-One-shot real usage read:
-
-```bash
-uv run python -m codexbar
-```
-
-Deterministic diagnostic mode:
-
-```bash
-uv run python -m codexbar --mock
-```
-
-Linux tray using the authenticated Codex provider:
-
-```bash
+uv sync --extra dev --extra gui --extra native-indicator
+uv run pytest -ra
+uv run python -m compileall -q src
 uv run python -m codexbar --gui
 ```
 
-Tray with deterministic mock data:
+`native-indicator` is retained as a capability/documentation extra; it does not install PyGObject from
+PyPI. If the native Ayatana backend cannot become ready, CodexBar automatically falls back to the Qt tray.
+
+For a deterministic UI run without querying the real Codex provider:
 
 ```bash
 uv run python -m codexbar --mock --gui
 ```
 
-## Development
+For the CLI:
 
 ```bash
+uv run python -m codexbar
+```
+
+## Native-indicator diagnostics
+
+If the GUI starts but the native indicator is not visible, run:
+
+```bash
+uv run python -m codexbar --diagnose-indicator
+```
+
+The diagnostic checks the system Python, GI/Ayatana/GTK imports, indicator creation, menu/label publication
+and the native event loop. The helper is launched with a sanitized environment so Snap/IDE runtime library
+paths cannot override the host glibc/GTK stack. If native startup fails, the normal application must remain
+usable through the Qt fallback.
+
+## Development checks
+
+Before committing:
+
+```bash
+uv sync --extra dev --extra gui --extra native-indicator
 uv run pytest -ra
 uv run python -m compileall -q src
+git status
 ```
 
-With optional quality tools installed by the `dev` extra:
+`uv.lock` **is versioned**. `.venv/`, caches, build outputs and generated local artifacts are not.
+
+Recommended commit flow:
 
 ```bash
-uv run ruff check .
-uv run mypy src
+git status
+git add <intended-files>
+git diff --cached
+git commit -m "type: concise description"
 ```
 
-## Design
-Read, in order:
-1. `CONSTITUTION.md`
-2. `PRODUCT_SPEC.md`
-3. `docs/specs/v1.0/REQ-USAGE-001.md`
-4. `docs/specs/v1.0/REQ-UI-001.md`
-5. `docs/adr/ADR-002-codex-source.md`
-6. `docs/TRACEABILITY.md`
-7. `docs/tasks/v1.0/TASKS.md`
-8. `docs/VALIDATION.md`
+Do not use `git add .` blindly when local diagnostic/output files are present. Review the staged diff first.
+
+See `docs/GIT_WORKFLOW.md` for repository hygiene and `AGENTS.md` for the specification/TDD workflow.
+
+## Documentation map
+
+- `CONSTITUTION.md` — engineering rules and invariants.
+- `PRODUCT_SPEC.md` — product scope and non-functional requirements.
+- `docs/specs/v1.0/` — normative requirements and release gates.
+- `docs/tasks/v1.0/TASKS.md` — implementation tasks derived from requirements.
+- `docs/TRACEABILITY.md` — requirement → acceptance criterion → test → implementation mapping.
+- `docs/VALIDATION.md` — automated and target-system validation evidence.
+- `docs/adr/` — architecture decisions.
+- `docs/INSTALLATION.md` — current source-based installation and troubleshooting.
+- `docs/GIT_WORKFLOW.md` — clone/update/branch/commit rules.
+
+## Security boundary
+
+CodexBar does not manage Codex credentials. The main provider talks to the locally authenticated Codex
+app-server. The native indicator helper receives presentation strings and UI intents only; credentials,
+raw provider payloads and account identifiers must not cross the helper IPC boundary.
+
+## Roadmap
+
+The next planned cycle is `REQ-DESKTOP-001`: normal desktop installation, `.desktop` integration,
+opt-in autostart, clean uninstall and packaging without development dependencies.

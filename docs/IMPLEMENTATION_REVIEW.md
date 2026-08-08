@@ -81,3 +81,59 @@ click; only double click reached the application and the reliable Quit route was
 uses an adaptive model: a registered menu is the guaranteed glance/control surface, while `Trigger` and
 `DoubleClick` opportunistically open details. The details panel itself now exposes Quit. This is simpler
 and safer than adding desktop-specific event hacks before REQ-UI-002/desktop-backend evaluation.
+
+## Native Linux indicator decision
+
+The portable Qt tray remains the baseline because it is already validated on the target Linux desktop.
+For adjacent dynamic quota text, the implementation now probes for Ayatana AppIndicator at runtime and,
+when available, uses its `set_label(label, guide)` capability. PyGObject and Ayatana are optional because
+forcing GTK/GObject dependencies on every installation would reduce portability and make the core GUI
+harder to bootstrap. The native adapter pumps the GLib main context from a short Qt timer, so the existing
+Qt application/controller remains the single process and the provider refresh still executes outside the
+GUI thread. If native bindings are absent, selection falls back to QSystemTrayIcon with no functional loss.
+
+## Native indicator process isolation correction
+Target installation demonstrated that compiling PyGObject from PyPI inside the uv environment is not a
+stable desktop-integration strategy: the project Python (3.14.4) and distro GObject Introspection headers
+were incompatible with the pinned PyGObject source layout. The system Python already exposes a working
+`gi` module, so ADR-003 moves GTK/Ayatana behind a helper subprocess.
+
+The updated structure is:
+
+```text
+PySide6 / uv main process
+        |
+        | JSON Lines: set_glance / quit
+        v
+/usr/bin/python3 native_indicator_helper.py
+        |
+        +-- python3-gi
+        +-- Gtk 3
+        +-- AyatanaAppIndicator3
+        |
+        ^ JSON Lines: refresh / details / quit
+```
+
+This adds one explicit process boundary but removes a more dangerous implicit ABI boundary from the uv
+environment. The helper receives no Codex credentials, raw app-server responses or account data. Native
+capability probing is performed by `/usr/bin/python3`; failure selects the validated Qt tray backend.
+The design therefore preserves graceful degradation and keeps the core/application/domain layers unchanged.
+
+## Native indicator diagnostics
+The optional Ayatana path now has an explicit provider-independent diagnostic mode. This closes an
+observability gap discovered on the target desktop: a supervised fallback tells us that native readiness
+failed, but not which integration stage failed. `--diagnose-indicator` reports the system Python/helper,
+GI import, Ayatana import, GTK import, indicator construction, menu binding, label set, ACTIVE status and a
+bounded GLib-loop turn. The command deliberately does not claim physical shell visibility.
+
+
+## Native helper runtime sanitization
+Target diagnostics showed a Snap-packaged VS Code terminal could inject `/snap/core20` libraries into `/usr/bin/python3`, producing a glibc symbol-lookup failure even though GI, GTK and Ayatana were correctly installed. The helper launcher now centralizes environment construction in `sanitized_native_environment()`. Availability probes, diagnostics and the production helper all use the same sanitizer, so capability detection and execution no longer disagree merely because of inherited loader state. The sanitizer removes loader/Python/GTK/GIO override variables and `SNAP*` values while preserving graphical-session and D-Bus variables.
+
+
+## REQ-UI-002 closeout
+Target revalidation after environment sanitization succeeded on Ubuntu/GNOME/Wayland: the Ayatana helper
+reached readiness from the previously problematic VS Code/Snap launch environment, the available weekly
+percentage rendered in the desktop bar, and menu behavior remained functional. REQ-UI-002 is therefore
+closed. The next architectural increment is REQ-DESKTOP-001; no ad-hoc installer/autostart behavior should
+be added before that requirement is specified and acceptance-tested.

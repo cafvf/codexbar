@@ -32,3 +32,27 @@ class UsageParseError(UsageError):
 
 class UsageSchemaError(UsageParseError):
     """Source data shape is unsupported or incomplete."""
+
+
+class SettingsError(CodexBarError):
+    """Base class for expected settings failures."""
+
+
+class SettingsValidationError(SettingsError):
+    """A requested settings value is outside the supported domain."""
+
+
+class SettingsDocumentError(SettingsError):
+    """Persisted settings content is malformed or semantically invalid."""
+
+
+class SettingsSchemaError(SettingsDocumentError):
+    """Persisted settings schema is unsupported or structurally incompatible."""
+
+
+class SettingsReadError(SettingsError):
+    """Settings storage cannot be read."""
+
+
+class SettingsWriteError(SettingsError):
+    """Settings storage cannot be updated safely."""

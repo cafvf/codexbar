@@ -3,7 +3,7 @@ from __future__ import annotations
 import sys
 from datetime import datetime
 
-from PySide6.QtCore import QPoint, QRectF, QSize, QTimer, Qt
+from PySide6.QtCore import QByteArray, QBuffer, QIODevice, QPoint, QRectF, QSize, QTimer, Qt
 from PySide6.QtGui import QAction, QColor, QFont, QIcon, QPainter, QPen, QPixmap
 from PySide6.QtWidgets import (
     QApplication,
@@ -23,6 +23,7 @@ from codexbar.application.refresh import RefreshCoordinator
 from codexbar.application.use_cases import GetCurrentUsage
 from codexbar.ui.controller import TrayController, TrayPhase, TraySettings, TrayViewState
 from codexbar.ui.errors import SystemTrayUnavailableError
+from codexbar.ui.native_indicator import NativeIndicator, create_ayatana_indicator
 
 
 class UsagePanel(QDialog):
@@ -122,6 +123,18 @@ def create_codexbar_icon(size: int = 64) -> QIcon:
     painter.end()
     return QIcon(pixmap)
 
+def codexbar_icon_png(size: int = 64) -> bytes:
+    """Serialize the project-owned tray icon for native indicator backends."""
+
+    pixmap = create_codexbar_icon(size).pixmap(size, size)
+    data = QByteArray()
+    buffer = QBuffer(data)
+    if not buffer.open(QIODevice.OpenModeFlag.WriteOnly):
+        raise RuntimeError("unable to allocate icon buffer")
+    if not pixmap.save(buffer, "PNG"):
+        raise RuntimeError("unable to serialize CodexBar icon")
+    return bytes(data)
+
 
 class TrayShell:
     def __init__(
@@ -130,9 +143,6 @@ class TrayShell:
         provider: UsageProvider,
         settings: TraySettings,
     ) -> None:
-        if not QSystemTrayIcon.isSystemTrayAvailable():
-            raise SystemTrayUnavailableError("system tray is not available in this desktop session")
-
         self._app = app
         self._settings = settings
         self._controller = TrayController(RefreshCoordinator(GetCurrentUsage(provider)))
@@ -140,9 +150,16 @@ class TrayShell:
         self._panel.refresh_button.clicked.connect(self.refresh)
         self._panel.quit_button.clicked.connect(app.quit)
 
-        self._tray = QSystemTrayIcon(create_codexbar_icon(), app)
-        self._tray.setToolTip("CodexBar")
-        self._tray.activated.connect(self._on_tray_activated)
+        self._native_indicator: NativeIndicator | None = create_ayatana_indicator(
+            icon_png=codexbar_icon_png(),
+            on_refresh=self.refresh,
+            on_details=self.show_panel,
+            on_quit=app.quit,
+        )
+
+        self._tray: QSystemTrayIcon | None = None
+        if self._native_indicator is None:
+            self._ensure_qt_tray()
 
         # QSystemTrayIcon activation is desktop-dependent. In particular, GNOME-based
         # StatusNotifier/AppIndicator implementations may consume primary activation and
@@ -164,7 +181,8 @@ class TrayShell:
         self._menu.addAction(details_action)
         self._menu.addSeparator()
         self._menu.addAction(quit_action)
-        self._tray.setContextMenu(self._menu)
+        if self._tray is not None:
+            self._tray.setContextMenu(self._menu)
 
         self._refresh_timer = QTimer(app)
         self._refresh_timer.setInterval(settings.refresh_interval_seconds * 1000)
@@ -174,10 +192,19 @@ class TrayShell:
         self._poll_timer.setInterval(settings.poll_interval_milliseconds)
         self._poll_timer.timeout.connect(self._poll)
 
-        app.aboutToQuit.connect(self._controller.close)
+        self._native_event_timer = QTimer(app)
+        self._native_event_timer.setInterval(20)
+        if self._native_indicator is not None:
+            self._native_event_timer.timeout.connect(self._native_indicator.pump_events)
+
+        app.aboutToQuit.connect(self._close)
 
     def start(self) -> None:
-        self._tray.show()
+        if self._native_indicator is not None:
+            self._native_indicator.show()
+            self._native_event_timer.start()
+        elif self._tray is not None:
+            self._tray.show()
         self._poll_timer.start()
         self._refresh_timer.start()
         self.refresh()
@@ -189,8 +216,38 @@ class TrayShell:
     def _poll(self) -> None:
         state = self._controller.poll()
         self._panel.render(state)
-        self._tray.setToolTip(self._tooltip(state))
-        self._summary_action.setText(self._menu_summary(state))
+        summary = self._menu_summary(state)
+
+        if self._native_indicator is not None and not self._native_indicator.is_healthy():
+            self._native_indicator.close()
+            self._native_indicator = None
+            self._native_event_timer.stop()
+            self._activate_qt_fallback()
+
+        if self._native_indicator is not None:
+            self._native_indicator.set_glance(
+                state.usage.glance_text if state.usage is not None else state.phase.value,
+                stale=state.phase is TrayPhase.STALE,
+            )
+        elif self._tray is not None:
+            self._tray.setToolTip(self._tooltip(state))
+        self._summary_action.setText(summary)
+
+
+    def _ensure_qt_tray(self) -> None:
+        if self._tray is not None:
+            return
+        if not QSystemTrayIcon.isSystemTrayAvailable():
+            raise SystemTrayUnavailableError("system tray is not available in this desktop session")
+        self._tray = QSystemTrayIcon(create_codexbar_icon(), self._app)
+        self._tray.setToolTip("CodexBar")
+        self._tray.activated.connect(self._on_tray_activated)
+
+    def _activate_qt_fallback(self) -> None:
+        self._ensure_qt_tray()
+        if self._tray is not None:
+            self._tray.setContextMenu(self._menu)
+            self._tray.show()
 
     def _tooltip(self, state: TrayViewState) -> str:
         if state.usage is None:
@@ -221,6 +278,11 @@ class TrayShell:
         if state.phase is TrayPhase.ERROR:
             return f"{summary} · error"
         return summary
+
+    def _close(self) -> None:
+        self._controller.close()
+        if self._native_indicator is not None:
+            self._native_indicator.close()
 
     def show_panel(self) -> None:
         self._panel.show()

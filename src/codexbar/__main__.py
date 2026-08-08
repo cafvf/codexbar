@@ -18,6 +18,11 @@ def build_parser() -> argparse.ArgumentParser:
         help="use deterministic demonstration data instead of the local Codex app-server",
     )
     parser.add_argument(
+        "--diagnose-indicator",
+        action="store_true",
+        help="diagnose the optional system-Python/Ayatana indicator backend and exit",
+    )
+    parser.add_argument(
         "--gui",
         action="store_true",
         help="run the Linux system-tray interface instead of the one-shot CLI output",
@@ -27,6 +32,23 @@ def build_parser() -> argparse.ArgumentParser:
 
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
+    if args.diagnose_indicator:
+        from codexbar.ui.native_indicator import run_indicator_diagnostics
+
+        report = run_indicator_diagnostics()
+        print("CodexBar native indicator diagnostics")
+        for step in report.steps:
+            marker = "PASS" if step.ok else "FAIL"
+            detail = f" — {step.detail}" if step.detail else ""
+            print(f"[{marker}] {step.name}{detail}")
+        if report.stderr:
+            print(f"[stderr] {report.stderr}", file=sys.stderr)
+        if report.ok:
+            print("Result: native indicator API path completed; physical shell rendering still requires visual validation.")
+            return 0
+        print("Result: native indicator diagnostic failed; Qt fallback should be used.", file=sys.stderr)
+        return report.exit_code or 2
+
     provider = MockUsageProvider() if args.mock else CodexAppServerProvider()
 
     if args.gui:

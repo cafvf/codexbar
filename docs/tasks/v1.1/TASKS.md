@@ -1,6 +1,6 @@
 # v1.1 Tasks
 
-Status: persistence/application implementation phase
+Status: GUI settings implementation phase
 
 ## REQ-SETTINGS-001
 
@@ -14,9 +14,9 @@ Status: persistence/application implementation phase
 - [x] TASK-107 define settings port, load result/origin, and normalized settings errors.
 - [x] TASK-108 implement JSON/XDG settings repository with schema-v1 validation and atomic replacement.
 - [x] TASK-109 implement get/save/reset application use cases.
-- [ ] TASK-110 integrate configured LOW threshold with `UsagePolicy`.
-- [ ] TASK-111 make refresh cadence runtime-configurable without overlapping refresh operations.
-- [ ] TASK-112 implement `settings show` and `settings reset` CLI surfaces.
+- [x] TASK-110 integrate configured LOW threshold with `UsagePolicy`.
+- [x] TASK-111 make refresh cadence runtime-configurable without overlapping refresh operations.
+- [x] TASK-112 implement `settings show` and `settings reset` CLI surfaces.
 - [ ] TASK-113 implement Qt settings surface with Save/Cancel/Reset and validation feedback.
 - [ ] TASK-114 run repository-wide pytest/ruff/mypy/compileall gates.
 - [ ] TASK-115 validate GUI settings lifecycle and restart persistence on target Linux workstation.

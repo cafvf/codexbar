@@ -1,8 +1,12 @@
+from concurrent.futures import Future
 from datetime import UTC, datetime
 from decimal import Decimal
 from importlib import import_module
 from pathlib import Path
+from typing import Any
 
+from codexbar.application.refresh import RefreshCoordinator
+from codexbar.application.use_cases import GetCurrentUsage
 from codexbar.domain.models import (
     Fraction,
     UsageSnapshot,
@@ -10,9 +14,36 @@ from codexbar.domain.models import (
     UsageWindow,
     UsageWindowId,
 )
+from codexbar.ui.controller import TrayController
 from codexbar.ui.viewmodel import UsageViewModel
 
 OBSERVED_AT = datetime(2026, 8, 8, 12, 0, tzinfo=UTC)
+
+
+class ImmediateExecutor:
+    def submit(self, fn: Any, *args: Any, **kwargs: Any) -> Future[object]:
+        future: Future[object] = Future()
+        try:
+            future.set_result(fn(*args, **kwargs))
+        except BaseException as exc:  # test executor mirrors Future semantics
+            future.set_exception(exc)
+        return future
+
+
+class StaticProvider:
+    def __init__(self, value: UsageSnapshot) -> None:
+        self._value = value
+
+    def get_usage(self) -> UsageSnapshot:
+        return self._value
+
+
+class RecordingRefreshTimer:
+    def __init__(self) -> None:
+        self.intervals: list[int] = []
+
+    def setInterval(self, milliseconds: int) -> None:
+        self.intervals.append(milliseconds)
 
 
 def _settings_modules():
@@ -108,6 +139,53 @@ def test_ac_settings_012_configured_threshold_changes_classification_not_snapsho
     assert default_state.windows[0].state.value == "low"
     assert configured_state.windows[0].state.value == "available"
     assert snapshot.windows[0].remaining == Fraction(Decimal("0.18"))
+
+
+def test_ac_settings_012_runtime_controller_uses_configured_threshold() -> None:
+    domain, _, _ = _settings_modules()
+    snapshot = UsageSnapshot(
+        windows=(
+            UsageWindow(
+                UsageWindowId("weekly"),
+                "Weekly",
+                Fraction(Decimal("0.18")),
+            ),
+        ),
+        observed_at=OBSERVED_AT,
+        source=UsageSource.MOCK,
+    )
+    configured = domain.AppSettings(
+        low_remaining_threshold=Fraction(Decimal("0.15")),
+        refresh_interval_seconds=domain.RefreshIntervalSeconds(60),
+        notifications_enabled=True,
+    )
+    controller = TrayController(
+        RefreshCoordinator(GetCurrentUsage(StaticProvider(snapshot))),
+        executor=ImmediateExecutor(),
+        usage_policy=configured.usage_policy(),
+    )
+
+    controller.start_refresh()
+    state = controller.poll()
+
+    assert state.usage is not None
+    assert state.usage.windows[0].state.value == "available"
+    assert snapshot.windows[0].remaining == Fraction(Decimal("0.18"))
+
+
+def test_ac_settings_013_existing_refresh_timer_accepts_live_interval_change() -> None:
+    domain, _, _ = _settings_modules()
+    controller_module = import_module("codexbar.ui.controller")
+    timer = RecordingRefreshTimer()
+    configured = domain.AppSettings(
+        low_remaining_threshold=Fraction(Decimal("0.20")),
+        refresh_interval_seconds=domain.RefreshIntervalSeconds(180),
+        notifications_enabled=True,
+    )
+
+    controller_module.apply_refresh_interval(timer, configured)
+
+    assert timer.intervals == [180_000]
 
 
 def test_ac_settings_015_016_017_reset_restores_defaults_and_preserves_neighbors(

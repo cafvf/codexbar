@@ -1,11 +1,16 @@
 from __future__ import annotations
 
+from collections.abc import Callable
+
 from codexbar.application.ports import UsageProvider
-from codexbar.ui.controller import DEFAULT_TRAY_SETTINGS, TraySettings
+from codexbar.application.settings import GetSettings, SettingsRepository
+from codexbar.domain.settings import AppSettings
 from codexbar.ui.errors import GuiDependencyError
 
+QtTrayRunner = Callable[[UsageProvider, AppSettings], int]
 
-def run_tray(provider: UsageProvider, settings: TraySettings = DEFAULT_TRAY_SETTINGS) -> int:
+
+def _load_qt_tray() -> QtTrayRunner:
     try:
         from codexbar.ui.tray import run_tray as run_qt_tray
     except ModuleNotFoundError as exc:
@@ -15,4 +20,13 @@ def run_tray(provider: UsageProvider, settings: TraySettings = DEFAULT_TRAY_SETT
                 "`uv sync --extra gui --extra dev`"
             ) from exc
         raise
-    return run_qt_tray(provider, settings)
+    return run_qt_tray
+
+
+def run_tray(
+    provider: UsageProvider,
+    *,
+    repository: SettingsRepository,
+) -> int:
+    settings = GetSettings(repository).execute().settings
+    return _load_qt_tray()(provider, settings)

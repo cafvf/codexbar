@@ -3,11 +3,12 @@ from __future__ import annotations
 from concurrent.futures import Executor, Future, ThreadPoolExecutor
 from dataclasses import dataclass
 from enum import StrEnum
-from typing import Final
+from typing import Final, Protocol
 
 from codexbar.application.refresh import RefreshCoordinator
 from codexbar.domain.errors import CodexBarError
-from codexbar.domain.models import UsageSnapshot
+from codexbar.domain.models import DEFAULT_USAGE_POLICY, UsagePolicy, UsageSnapshot
+from codexbar.domain.settings import AppSettings
 from codexbar.ui.viewmodel import UsageViewModel, UsageViewState
 
 
@@ -33,6 +34,14 @@ class TraySettings:
 DEFAULT_TRAY_SETTINGS: Final = TraySettings()
 
 
+class IntervalTimer(Protocol):
+    def setInterval(self, milliseconds: int) -> None: ...
+
+
+def apply_refresh_interval(timer: IntervalTimer, settings: AppSettings) -> None:
+    timer.setInterval(settings.refresh_interval_seconds.value * 1000)
+
+
 @dataclass(frozen=True, slots=True)
 class TrayViewState:
     phase: TrayPhase
@@ -47,12 +56,14 @@ class TrayController:
         self,
         coordinator: RefreshCoordinator,
         executor: Executor | None = None,
+        usage_policy: UsagePolicy = DEFAULT_USAGE_POLICY,
     ) -> None:
         self._coordinator = coordinator
         self._executor = executor or ThreadPoolExecutor(
             max_workers=1, thread_name_prefix="codexbar"
         )
         self._owns_executor = executor is None
+        self._usage_policy = usage_policy
         self._future: Future[UsageSnapshot] | None = None
         self._state = TrayViewState(phase=TrayPhase.LOADING)
 
@@ -91,7 +102,7 @@ class TrayController:
             )
             return self._state
 
-        usage = UsageViewModel.from_snapshot(snapshot)
+        usage = UsageViewModel.from_snapshot(snapshot, self._usage_policy)
         phase = TrayPhase.STALE if usage.stale else TrayPhase.FRESH
         self._state = TrayViewState(phase=phase, usage=usage)
         return self._state

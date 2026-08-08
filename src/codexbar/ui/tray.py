@@ -22,7 +22,14 @@ from PySide6.QtWidgets import (
 from codexbar.application.ports import UsageProvider
 from codexbar.application.refresh import RefreshCoordinator
 from codexbar.application.use_cases import GetCurrentUsage
-from codexbar.ui.controller import TrayController, TrayPhase, TraySettings, TrayViewState
+from codexbar.domain.settings import AppSettings
+from codexbar.ui.controller import (
+    DEFAULT_TRAY_SETTINGS,
+    TrayController,
+    TrayPhase,
+    TrayViewState,
+    apply_refresh_interval,
+)
 from codexbar.ui.errors import SystemTrayUnavailableError
 from codexbar.ui.native_indicator import NativeIndicator, create_ayatana_indicator
 
@@ -100,8 +107,6 @@ class UsagePanel(QDialog):
 
 
 def create_codexbar_icon(size: int = 64) -> QIcon:
-    """Create a small project-owned terminal-style icon without third-party branding."""
-
     pixmap = QPixmap(QSize(size, size))
     pixmap.fill(Qt.GlobalColor.transparent)
 
@@ -139,9 +144,8 @@ def create_codexbar_icon(size: int = 64) -> QIcon:
     painter.end()
     return QIcon(pixmap)
 
-def codexbar_icon_png(size: int = 64) -> bytes:
-    """Serialize the project-owned tray icon for native indicator backends."""
 
+def codexbar_icon_png(size: int = 64) -> bytes:
     pixmap = create_codexbar_icon(size).pixmap(size, size)
     data = QByteArray()
     buffer = QBuffer(data)
@@ -153,15 +157,13 @@ def codexbar_icon_png(size: int = 64) -> bytes:
 
 
 class TrayShell:
-    def __init__(
-        self,
-        app: QApplication,
-        provider: UsageProvider,
-        settings: TraySettings,
-    ) -> None:
+    def __init__(self, app: QApplication, provider: UsageProvider, settings: AppSettings) -> None:
         self._app = app
         self._settings = settings
-        self._controller = TrayController(RefreshCoordinator(GetCurrentUsage(provider)))
+        self._controller = TrayController(
+            RefreshCoordinator(GetCurrentUsage(provider)),
+            usage_policy=settings.usage_policy(),
+        )
         self._panel = UsagePanel()
         self._panel.refresh_button.clicked.connect(self.refresh)
         self._panel.quit_button.clicked.connect(app.quit)
@@ -177,11 +179,6 @@ class TrayShell:
         if self._native_indicator is None:
             self._ensure_qt_tray()
 
-        # QSystemTrayIcon activation is desktop-dependent. In particular, GNOME-based
-        # StatusNotifier/AppIndicator implementations may consume primary activation and
-        # open the registered menu without emitting Trigger. Keep a registered menu as a
-        # guaranteed control/quit surface, but make it useful immediately: the first
-        # disabled action contains the live glance summary, so there is no Show indirection.
         self._menu = QMenu()
         self._summary_action = QAction("Loading usage…", self._menu)
         self._summary_action.setEnabled(False)
@@ -201,11 +198,11 @@ class TrayShell:
             self._tray.setContextMenu(self._menu)
 
         self._refresh_timer = QTimer(app)
-        self._refresh_timer.setInterval(settings.refresh_interval_seconds * 1000)
+        apply_refresh_interval(self._refresh_timer, settings)
         self._refresh_timer.timeout.connect(self.refresh)
 
         self._poll_timer = QTimer(app)
-        self._poll_timer.setInterval(settings.poll_interval_milliseconds)
+        self._poll_timer.setInterval(DEFAULT_TRAY_SETTINGS.poll_interval_milliseconds)
         self._poll_timer.timeout.connect(self._poll)
 
         self._native_event_timer = QTimer(app)
@@ -214,6 +211,10 @@ class TrayShell:
             self._native_event_timer.timeout.connect(self._native_indicator.pump_events)
 
         app.aboutToQuit.connect(self._close)
+
+    def apply_settings(self, settings: AppSettings) -> None:
+        self._settings = settings
+        apply_refresh_interval(self._refresh_timer, settings)
 
     def start(self) -> None:
         if self._native_indicator is not None:
@@ -305,7 +306,7 @@ class TrayShell:
         self._panel.activateWindow()
 
 
-def run_tray(provider: UsageProvider, settings: TraySettings) -> int:
+def run_tray(provider: UsageProvider, settings: AppSettings) -> int:
     instance = QApplication.instance()
     app = instance if isinstance(instance, QApplication) else QApplication(sys.argv)
     app.setQuitOnLastWindowClosed(False)

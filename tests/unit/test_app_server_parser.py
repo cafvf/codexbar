@@ -1,11 +1,11 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import pytest
 
 from codexbar.domain.errors import UsageSchemaError
 from codexbar.infrastructure.app_server import parse_rate_limits_response
 
-NOW = datetime(2026, 8, 8, tzinfo=timezone.utc)
+NOW = datetime(2026, 8, 8, tzinfo=UTC)
 
 
 @pytest.mark.parametrize(

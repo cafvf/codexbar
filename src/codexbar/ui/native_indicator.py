@@ -4,11 +4,11 @@ import json
 import os
 import select
 import subprocess
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from typing import Callable, Final, Protocol, runtime_checkable
-
+from typing import Final, Protocol, runtime_checkable
 
 NATIVE_LABEL_GUIDE: Final = "5h: 100% · W: 100% · stale"
 SYSTEM_PYTHON: Final = "/usr/bin/python3"
@@ -105,8 +105,7 @@ def ayatana_availability(system_python: str = SYSTEM_PYTHON) -> NativeIndicatorA
         completed = subprocess.run(
             [system_python, "-c", probe],
             stdin=subprocess.DEVNULL,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
+            capture_output=True,
             text=True,
             timeout=3.0,
             check=False,
@@ -281,7 +280,9 @@ def run_indicator_diagnostics(
     helper = _helper_path()
     preflight: list[IndicatorDiagnosticStep] = []
     if not Path(system_python).is_file():
-        preflight.append(IndicatorDiagnosticStep("system-python", False, f"not found: {system_python}"))
+        preflight.append(
+            IndicatorDiagnosticStep("system-python", False, f"not found: {system_python}")
+        )
         return IndicatorDiagnosticReport(tuple(preflight), 2)
     preflight.append(IndicatorDiagnosticStep("system-python", True, system_python))
     if not helper.is_file():
@@ -293,8 +294,7 @@ def run_indicator_diagnostics(
         completed = subprocess.run(
             [system_python, str(helper), "--diagnose"],
             stdin=subprocess.DEVNULL,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
+            capture_output=True,
             text=True,
             timeout=timeout_seconds,
             check=False,
@@ -330,7 +330,9 @@ def run_indicator_diagnostics(
             )
         )
     if not any(step.name == "glib-loop" for step in steps):
-        steps.append(IndicatorDiagnosticStep("helper-diagnostic", False, "diagnostic did not complete"))
+        steps.append(
+            IndicatorDiagnosticStep("helper-diagnostic", False, "diagnostic did not complete")
+        )
     return IndicatorDiagnosticReport(tuple(steps), completed.returncode, completed.stderr.strip())
 
 

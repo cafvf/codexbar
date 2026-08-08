@@ -1,12 +1,19 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from decimal import Decimal
 
-from codexbar.domain.models import Fraction, Freshness, UsageSnapshot, UsageSource, UsageWindow, UsageWindowId
+from codexbar.domain.models import (
+    Fraction,
+    Freshness,
+    UsageSnapshot,
+    UsageSource,
+    UsageWindow,
+    UsageWindowId,
+)
 from codexbar.ui.viewmodel import UsageViewModel
 
 
 def test_viewmodel_maps_snapshot_without_source_knowledge() -> None:
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     snapshot = UsageSnapshot(
         (UsageWindow(UsageWindowId("weekly"), "Weekly", Fraction(Decimal("0.81"))),),
         now,
@@ -21,7 +28,7 @@ def test_viewmodel_maps_snapshot_without_source_knowledge() -> None:
 
 
 def test_viewmodel_falls_back_to_semantic_label_for_legacy_ids() -> None:
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     snapshot = UsageSnapshot(
         (UsageWindow(UsageWindowId("weekly"), "Weekly", Fraction(Decimal("0.62"))),),
         now,

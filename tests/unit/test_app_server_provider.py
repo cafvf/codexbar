@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 import pytest
@@ -42,7 +42,7 @@ def test_provider_performs_required_handshake_and_rate_limit_read() -> None:
             },
         ]
     )
-    now = datetime(2026, 8, 8, tzinfo=timezone.utc)
+    now = datetime(2026, 8, 8, tzinfo=UTC)
     provider = CodexAppServerProvider(lambda: transport, clock=lambda: now)
 
     snapshot = provider.get_usage()

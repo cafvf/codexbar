@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from decimal import Decimal
 
 import pytest
@@ -6,11 +6,18 @@ import pytest
 from codexbar.application.refresh import RefreshCoordinator
 from codexbar.application.use_cases import GetCurrentUsage
 from codexbar.domain.errors import UsageSchemaError, UsageSourceUnavailableError
-from codexbar.domain.models import Fraction, Freshness, UsageSnapshot, UsageSource, UsageWindow, UsageWindowId
+from codexbar.domain.models import (
+    Fraction,
+    Freshness,
+    UsageSnapshot,
+    UsageSource,
+    UsageWindow,
+    UsageWindowId,
+)
 from codexbar.infrastructure.app_server import parse_rate_limits_response
 from codexbar.ui.viewmodel import UsageViewModel
 
-OBSERVED_AT = datetime(2026, 8, 8, 12, 0, tzinfo=timezone.utc)
+OBSERVED_AT = datetime(2026, 8, 8, 12, 0, tzinfo=UTC)
 
 
 def test_ac_usage_001_used_percent_is_normalized_to_remaining_fraction(fixture_json) -> None:
@@ -49,7 +56,10 @@ def test_ac_usage_005_reset_timestamps_are_timezone_aware(fixture_json) -> None:
     snapshot = parse_rate_limits_response(
         fixture_json("rate_limits_two_windows.json"), observed_at=OBSERVED_AT
     )
-    assert all(w.resets_at is not None and w.resets_at.utcoffset() is not None for w in snapshot.windows)
+    assert all(
+        w.resets_at is not None and w.resets_at.utcoffset() is not None
+        for w in snapshot.windows
+    )
 
 
 def test_ac_usage_006_source_failure_is_exposed_as_typed_error() -> None:

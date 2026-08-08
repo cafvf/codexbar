@@ -11,7 +11,8 @@ def run_tray(provider: UsageProvider, settings: TraySettings = DEFAULT_TRAY_SETT
     except ModuleNotFoundError as exc:
         if exc.name and exc.name.startswith("PySide6"):
             raise GuiDependencyError(
-                'PySide6 is required for the tray UI; install with `uv sync --extra gui --extra dev`'
+                "PySide6 is required for the tray UI; install with "
+                "`uv sync --extra gui --extra dev`"
             ) from exc
         raise
     return run_qt_tray(provider, settings)

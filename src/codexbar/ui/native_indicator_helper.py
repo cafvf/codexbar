@@ -14,6 +14,7 @@ import os
 import sys
 import tempfile
 import threading
+from contextlib import suppress
 from pathlib import Path
 from typing import Any
 
@@ -34,7 +35,7 @@ def _emit_diagnostic(step: str, ok: bool, detail: str | None = None) -> None:
     print(json.dumps(payload, separators=(",", ":")), flush=True)
 
 
-def _load_bindings():
+def _load_bindings() -> tuple[Any, Any, Any]:
     import gi
 
     gi.require_version("AyatanaAppIndicator3", "0.1")
@@ -55,9 +56,15 @@ def _reader(GLib: Any, apply_command: Any) -> None:
 
 
 def _run_diagnostics() -> int:
-    _emit_diagnostic("environment", True, f"desktop={os.environ.get('XDG_CURRENT_DESKTOP', '')}; session={os.environ.get('XDG_SESSION_TYPE', '')}; display={bool(os.environ.get('DISPLAY'))}; wayland={bool(os.environ.get('WAYLAND_DISPLAY'))}")
+    environment_detail = (
+        f"desktop={os.environ.get('XDG_CURRENT_DESKTOP', '')}; "
+        f"session={os.environ.get('XDG_SESSION_TYPE', '')}; "
+        f"display={bool(os.environ.get('DISPLAY'))}; "
+        f"wayland={bool(os.environ.get('WAYLAND_DISPLAY'))}"
+    )
+    _emit_diagnostic("environment", True, environment_detail)
     try:
-        import gi  # noqa: F401
+        import gi
     except Exception as exc:
         _emit_diagnostic("gi-import", False, repr(exc))
         return 10
@@ -132,11 +139,13 @@ def _run_diagnostics() -> int:
             _emit_diagnostic("glib-loop", False, repr(exc))
             return 17
         finally:
-            try:
+            with suppress(Exception):
                 indicator.set_status(AyatanaAppIndicator3.IndicatorStatus.PASSIVE)
-            except Exception:
-                pass
-        _emit_diagnostic("glib-loop", True, "250 ms loop completed; physical shell rendering is not asserted")
+        _emit_diagnostic(
+            "glib-loop",
+            True,
+            "250 ms loop completed; physical shell rendering is not asserted",
+        )
     return 0
 
 

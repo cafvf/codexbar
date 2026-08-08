@@ -1,9 +1,16 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from decimal import Decimal
 
 import pytest
 
-from codexbar.domain.models import Fraction, UsagePolicy, UsageSnapshot, UsageSource, UsageWindow, UsageWindowId
+from codexbar.domain.models import (
+    Fraction,
+    UsagePolicy,
+    UsageSnapshot,
+    UsageSource,
+    UsageWindow,
+    UsageWindowId,
+)
 
 
 def test_fraction_from_percent_and_percent_are_inverse() -> None:
@@ -13,7 +20,7 @@ def test_fraction_from_percent_and_percent_are_inverse() -> None:
 
 
 def test_snapshot_rejects_duplicate_window_ids() -> None:
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     window = UsageWindow(UsageWindowId("same"), "Window", Fraction(Decimal("0.5")))
     with pytest.raises(ValueError, match="unique"):
         UsageSnapshot((window, window), now, UsageSource.MOCK)

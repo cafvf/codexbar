@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 
 from codexbar.domain.models import Fraction, UsageSnapshot, UsageSource, UsageWindow, UsageWindowId
@@ -6,7 +6,7 @@ from codexbar.domain.models import Fraction, UsageSnapshot, UsageSource, UsageWi
 
 class MockUsageProvider:
     def __init__(self, now: datetime | None = None) -> None:
-        self._now = now or datetime.now(timezone.utc)
+        self._now = now or datetime.now(UTC)
 
     def get_usage(self) -> UsageSnapshot:
         return UsageSnapshot(

@@ -2,9 +2,10 @@ from __future__ import annotations
 
 import sys
 from datetime import datetime
+from typing import cast
 
-from PySide6.QtCore import QByteArray, QBuffer, QIODevice, QPoint, QRectF, QSize, QTimer, Qt
-from PySide6.QtGui import QAction, QColor, QFont, QIcon, QPainter, QPen, QPixmap
+from PySide6.QtCore import QBuffer, QByteArray, QIODevice, QPoint, QRectF, QSize, Qt, QTimer
+from PySide6.QtGui import QAction, QColor, QIcon, QPainter, QPen, QPixmap
 from PySide6.QtWidgets import (
     QApplication,
     QDialog,
@@ -47,7 +48,7 @@ class UsagePanel(QDialog):
         controls.addWidget(self.quit_button)
         self._layout.addLayout(controls)
 
-    def render(self, state: TrayViewState) -> None:
+    def render_state(self, state: TrayViewState) -> None:
         self._clear_windows()
         usage = state.usage
 
@@ -91,6 +92,8 @@ class UsagePanel(QDialog):
     def _clear_windows(self) -> None:
         while self._windows.count():
             item = self._windows.takeAt(0)
+            if item is None:
+                continue
             widget = item.widget()
             if widget is not None:
                 widget.deleteLater()
@@ -109,7 +112,11 @@ def create_codexbar_icon(size: int = 64) -> QIcon:
     painter.setBrush(background)
     painter.setPen(Qt.PenStyle.NoPen)
     margin = size * 0.08
-    painter.drawRoundedRect(QRectF(margin, margin, size - 2 * margin, size - 2 * margin), size * 0.2, size * 0.2)
+    painter.drawRoundedRect(
+        QRectF(margin, margin, size - 2 * margin, size - 2 * margin),
+        size * 0.2,
+        size * 0.2,
+    )
 
     pen = QPen(foreground)
     pen.setWidthF(max(2.0, size * 0.065))
@@ -117,9 +124,18 @@ def create_codexbar_icon(size: int = 64) -> QIcon:
     pen.setJoinStyle(Qt.PenJoinStyle.RoundJoin)
     painter.setPen(pen)
 
-    painter.drawLine(QPoint(int(size * 0.29), int(size * 0.34)), QPoint(int(size * 0.47), int(size * 0.50)))
-    painter.drawLine(QPoint(int(size * 0.47), int(size * 0.50)), QPoint(int(size * 0.29), int(size * 0.66)))
-    painter.drawLine(QPoint(int(size * 0.51), int(size * 0.67)), QPoint(int(size * 0.72), int(size * 0.67)))
+    painter.drawLine(
+        QPoint(int(size * 0.29), int(size * 0.34)),
+        QPoint(int(size * 0.47), int(size * 0.50)),
+    )
+    painter.drawLine(
+        QPoint(int(size * 0.47), int(size * 0.50)),
+        QPoint(int(size * 0.29), int(size * 0.66)),
+    )
+    painter.drawLine(
+        QPoint(int(size * 0.51), int(size * 0.67)),
+        QPoint(int(size * 0.72), int(size * 0.67)),
+    )
     painter.end()
     return QIcon(pixmap)
 
@@ -133,7 +149,7 @@ def codexbar_icon_png(size: int = 64) -> bytes:
         raise RuntimeError("unable to allocate icon buffer")
     if not pixmap.save(buffer, "PNG"):
         raise RuntimeError("unable to serialize CodexBar icon")
-    return bytes(data)
+    return cast(bytes, data.data())
 
 
 class TrayShell:
@@ -211,11 +227,11 @@ class TrayShell:
 
     def refresh(self) -> None:
         if self._controller.start_refresh():
-            self._panel.render(self._controller.state)
+            self._panel.render_state(self._controller.state)
 
     def _poll(self) -> None:
         state = self._controller.poll()
-        self._panel.render(state)
+        self._panel.render_state(state)
         summary = self._menu_summary(state)
 
         if self._native_indicator is not None and not self._native_indicator.is_healthy():
@@ -232,7 +248,6 @@ class TrayShell:
         elif self._tray is not None:
             self._tray.setToolTip(self._tooltip(state))
         self._summary_action.setText(summary)
-
 
     def _ensure_qt_tray(self) -> None:
         if self._tray is not None:
@@ -291,7 +306,8 @@ class TrayShell:
 
 
 def run_tray(provider: UsageProvider, settings: TraySettings) -> int:
-    app = QApplication.instance() or QApplication(sys.argv)
+    instance = QApplication.instance()
+    app = instance if isinstance(instance, QApplication) else QApplication(sys.argv)
     app.setQuitOnLastWindowClosed(False)
     shell = TrayShell(app, provider, settings)
     shell.start()

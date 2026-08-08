@@ -49,7 +49,9 @@ class TrayController:
         executor: Executor | None = None,
     ) -> None:
         self._coordinator = coordinator
-        self._executor = executor or ThreadPoolExecutor(max_workers=1, thread_name_prefix="codexbar")
+        self._executor = executor or ThreadPoolExecutor(
+            max_workers=1, thread_name_prefix="codexbar"
+        )
         self._owns_executor = executor is None
         self._future: Future[UsageSnapshot] | None = None
         self._state = TrayViewState(phase=TrayPhase.LOADING)

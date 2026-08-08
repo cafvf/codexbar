@@ -30,3 +30,9 @@ Read `CONSTITUTION.md` before changing code.
 When a change affects installation, dependencies, runtime capabilities, validation status or Git workflow,
 update the user-facing `README.md` and the relevant normative/traceability documents in the same change.
 Repository use must not depend on chat/conversation history.
+
+
+## Desktop integration boundary
+Changes to installation or desktop integration must preserve REQ-DESKTOP-001: user-local XDG ownership,
+checkout-independent launcher paths, opt-in autostart, no development dependencies in the installed tool,
+and reversible removal. Do not add ad-hoc sudo/system-wide copies without a new requirement and ADR.

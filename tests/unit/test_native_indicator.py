@@ -54,7 +54,9 @@ def test_helper_indicator_sends_only_glance_payload(monkeypatch: pytest.MonkeyPa
     process = Mock(stdin=stdin, stdout=io.StringIO(), stderr=io.StringIO())
     process.poll.return_value = None
     monkeypatch.setattr(native_indicator.subprocess, "Popen", Mock(return_value=process))
-    monkeypatch.setattr(native_indicator.AyatanaHelperIndicator, "_await_ready", lambda self, **_: None)
+    monkeypatch.setattr(
+        native_indicator.AyatanaHelperIndicator, "_await_ready", lambda self, **_: None
+    )
 
     indicator = native_indicator.AyatanaHelperIndicator(
         icon_png=b"png",
@@ -99,22 +101,26 @@ def test_create_indicator_falls_back_when_system_bindings_are_missing(
 def test_helper_readiness_accepts_ready_event() -> None:
     import tempfile
 
-    stdout = tempfile.TemporaryFile(mode="w+t")
-    stdout.write('{"event":"ready"}\n')
-    stdout.seek(0)
-    process = Mock(stdout=stdout, stderr=io.StringIO())
-    process.poll.return_value = None
+    with tempfile.TemporaryFile(mode="w+t") as stdout:
+        stdout.write('{"event":"ready"}\n')
+        stdout.seek(0)
+        process = Mock(stdout=stdout, stderr=io.StringIO())
+        process.poll.return_value = None
 
-    indicator = native_indicator.AyatanaHelperIndicator.__new__(native_indicator.AyatanaHelperIndicator)
-    indicator._process = process
-    indicator._await_ready(timeout_seconds=0.2)
+        indicator = native_indicator.AyatanaHelperIndicator.__new__(
+            native_indicator.AyatanaHelperIndicator
+        )
+        indicator._process = process
+        indicator._await_ready(timeout_seconds=0.2)
 
 
 def test_helper_readiness_rejects_process_that_exits_before_ready() -> None:
     process = Mock(stdout=io.StringIO(), stderr=io.StringIO("registration failed"))
     process.poll.return_value = 1
 
-    indicator = native_indicator.AyatanaHelperIndicator.__new__(native_indicator.AyatanaHelperIndicator)
+    indicator = native_indicator.AyatanaHelperIndicator.__new__(
+        native_indicator.AyatanaHelperIndicator
+    )
     indicator._process = process
 
     with pytest.raises(RuntimeError, match="helper exited before ready: registration failed"):
@@ -145,11 +151,16 @@ def test_create_indicator_falls_back_when_helper_startup_fails(
     assert result is None
 
 
-def test_indicator_diagnostics_parses_structured_helper_steps(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_indicator_diagnostics_parses_structured_helper_steps(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     monkeypatch.setattr(Path, "is_file", lambda self: True)
     stdout = "\n".join(
         [
-            '{"type":"diagnostic","step":"gi-import","ok":true,"detail":"/usr/lib/python3/dist-packages/gi/__init__.py"}',
+            (
+                '{"type":"diagnostic","step":"gi-import","ok":true,'
+                '"detail":"/usr/lib/python3/dist-packages/gi/__init__.py"}'
+            ),
             '{"type":"diagnostic","step":"ayatana-import","ok":true}',
             '{"type":"diagnostic","step":"glib-loop","ok":true,"detail":"completed"}',
         ]
@@ -166,7 +177,9 @@ def test_indicator_diagnostics_parses_structured_helper_steps(monkeypatch: pytes
     assert [step.name for step in report.steps][-3:] == ["gi-import", "ayatana-import", "glib-loop"]
 
 
-def test_indicator_diagnostics_rejects_incomplete_helper_output(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_indicator_diagnostics_rejects_incomplete_helper_output(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     monkeypatch.setattr(Path, "is_file", lambda self: True)
     monkeypatch.setattr(
         native_indicator.subprocess,
@@ -174,7 +187,10 @@ def test_indicator_diagnostics_rejects_incomplete_helper_output(monkeypatch: pyt
         Mock(
             return_value=Mock(
                 returncode=13,
-                stdout='{"type":"diagnostic","step":"indicator-create","ok":false,"detail":"boom"}\n',
+                stdout=(
+                    '{"type":"diagnostic","step":"indicator-create",'
+                    '"ok":false,"detail":"boom"}\n'
+                ),
                 stderr="",
             )
         ),
@@ -187,7 +203,9 @@ def test_indicator_diagnostics_rejects_incomplete_helper_output(monkeypatch: pyt
     assert any(step.name == "helper-diagnostic" and not step.ok for step in report.steps)
 
 
-def test_indicator_diagnostics_reports_missing_system_python(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_indicator_diagnostics_reports_missing_system_python(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     monkeypatch.setattr(Path, "is_file", lambda self: False)
 
     report = native_indicator.run_indicator_diagnostics("/missing/python")
@@ -232,13 +250,17 @@ def test_sanitized_native_environment_removes_external_runtime_overrides() -> No
     assert not any(key == "SNAP" or key.startswith("SNAP_") for key in result)
 
 
-def test_helper_indicator_launches_with_sanitized_environment(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_helper_indicator_launches_with_sanitized_environment(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     stdin = io.StringIO()
     process = Mock(stdin=stdin, stdout=io.StringIO(), stderr=io.StringIO())
     process.poll.return_value = None
     popen = Mock(return_value=process)
     monkeypatch.setattr(native_indicator.subprocess, "Popen", popen)
-    monkeypatch.setattr(native_indicator.AyatanaHelperIndicator, "_await_ready", lambda self, **_: None)
+    monkeypatch.setattr(
+        native_indicator.AyatanaHelperIndicator, "_await_ready", lambda self, **_: None
+    )
     monkeypatch.setenv("LD_LIBRARY_PATH", "/snap/core20/current/lib/x86_64-linux-gnu")
     monkeypatch.setenv("SNAP", "/snap/code/current")
     monkeypatch.setenv("DISPLAY", ":0")

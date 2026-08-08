@@ -1,6 +1,6 @@
+import re
 from dataclasses import dataclass
 from datetime import datetime
-import re
 
 from codexbar.domain.models import (
     DEFAULT_USAGE_POLICY,

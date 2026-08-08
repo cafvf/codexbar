@@ -15,11 +15,29 @@
 - [x] TASK-012 architecture dependency tests — AC-009.
 - [x] TASK-013 stale refresh coordinator — AC-010.
 - [x] TASK-014 CLI smoke surface for real provider and `--mock` diagnostics.
+- [x] TASK-015 validate authenticated real provider on target Linux workstation.
 
-## REQ-UI-001 — Linux tray (next vertical slice)
-- [ ] TASK-020 specify tray lifecycle, refresh cadence and error presentation.
-- [ ] TASK-021 write acceptance tests for tray behavior.
-- [ ] TASK-022 implement PySide6 tray shell.
-- [ ] TASK-023 move refresh off GUI thread.
-- [ ] TASK-024 Linux GUI smoke tests.
-- [ ] TASK-025 packaging and desktop autostart.
+## REQ-UI-001 — Linux tray
+- [x] TASK-020 specify tray lifecycle, cadence, stale/error presentation and validation gate.
+- [x] TASK-021 write acceptance tests for asynchronous tray behavior.
+- [x] TASK-022 implement optional PySide6 tray shell and compact usage panel.
+- [x] TASK-023 move provider refresh off the GUI thread and prevent overlapping refreshes.
+- [x] TASK-024 add optional Qt smoke test harness.
+- [x] TASK-025 perform first target Qt tray validation; icon/panel/quit worked but AC-UI-006 failed because primary click opened the context menu.
+- [x] TASK-026 remove the registered tray context menu and route `Trigger` to panel toggle / `Context` to a manually popped menu.
+- [x] TASK-027 revalidate corrected primary-click behavior on target Linux; result: `Trigger` remained unavailable and removing the registered menu removed the reliable Quit path.
+- [x] TASK-027A implement adaptive tray interaction: registered live-data menu, `Trigger`/`DoubleClick` detail toggle, and panel-level Quit.
+- [ ] TASK-027B revalidate adaptive tray interaction and shutdown paths on target Linux.
+
+## REQ-UI-002 — Tray identity and glanceable usage
+- [x] TASK-028 specify project-owned tray identity and canonical glance string.
+- [x] TASK-029 implement compact window labels (`5h`, `W`) and tooltip fallback.
+- [x] TASK-029A replace generic computer icon with project-owned terminal-style icon.
+- [ ] TASK-029B validate project icon plus dynamic glance tooltip/menu summary on target Linux; icon rendering has already been observed successfully.
+- [ ] TASK-029C evaluate a native Linux indicator backend for text physically adjacent to the icon; do not emulate it by rasterizing long text into the square tray icon.
+
+## REQ-DESKTOP-001 — v1.0 completion
+- [ ] TASK-030 specify supported installation/desktop integration strategy.
+- [ ] TASK-031 package launcher/desktop entry without development dependencies.
+- [ ] TASK-032 add opt-in autostart support and removal path.
+- [ ] TASK-033 validate clean install, startup, shutdown and uninstall on target Linux.

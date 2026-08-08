@@ -18,3 +18,17 @@ def test_viewmodel_maps_snapshot_without_source_knowledge() -> None:
     assert state.windows[0].percent_left == 81
     assert state.stale is True
     assert state.rate_limit_reached_type == "weekly"
+
+
+def test_viewmodel_falls_back_to_semantic_label_for_legacy_ids() -> None:
+    now = datetime.now(timezone.utc)
+    snapshot = UsageSnapshot(
+        (UsageWindow(UsageWindowId("weekly"), "Weekly", Fraction(Decimal("0.62"))),),
+        now,
+        UsageSource.MOCK,
+    )
+
+    state = UsageViewModel.from_snapshot(snapshot)
+
+    assert state.windows[0].short_label == "W"
+    assert state.glance_text == "W: 62%"

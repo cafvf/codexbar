@@ -10,10 +10,9 @@ Validated on the target Ubuntu/GNOME/Wayland workstation:
 - `REQ-USAGE-001` — real Codex usage provider: **validated**.
 - `REQ-UI-001` — adaptive Linux tray interaction: **validated**.
 - `REQ-UI-002` — project-owned icon, glanceable quota presentation, Ayatana native label and Qt fallback: **validated**.
-- `REQ-DESKTOP-001` — installable desktop integration/autostart/packaging: **not implemented yet**.
+- `REQ-DESKTOP-001` — user-local installation, XDG desktop integration, opt-in autostart and uninstall: **validated**.
 
-The current development version is usable from a cloned repository. A system-wide/end-user installer is
-planned under `REQ-DESKTOP-001`.
+CodexBar 1.0.0 has completed the defined v1.0 acceptance gates on the target Ubuntu/GNOME/Wayland workstation.
 
 ## Prerequisites
 
@@ -39,32 +38,42 @@ PyGObject is intentionally **not** installed into the uv environment. The Ayatan
 small helper using `/usr/bin/python3` and distro-provided `gi` bindings. See
 `docs/adr/ADR-003-native-indicator-helper.md`.
 
-## Clone and run
+## Install and run
+
+For normal use from a clone or release source tree:
 
 ```bash
-git clone <repository-url>
+git clone https://github.com/cafvf/codexbar.git
 cd codexbar
+./scripts/install.sh
+```
 
+Then verify and start the installed application:
+
+```bash
+"$(uv tool dir --bin)/codexbar" desktop status
+"$(uv tool dir --bin)/codexbar" --gui
+```
+
+The installer uses `uv tool install` with PySide6 and **without development dependencies**, installs a
+user-local `.desktop` entry and project icon, and leaves autostart disabled. The installed application does
+not depend on the source checkout. See `docs/INSTALLATION.md` for autostart, checkout-independence validation
+and uninstall.
+
+For development from the repository:
+
+```bash
 uv sync --extra dev --extra gui --extra native-indicator
 uv run pytest -ra
 uv run python -m compileall -q src
 uv run python -m codexbar --gui
 ```
 
-`native-indicator` is retained as a capability/documentation extra; it does not install PyGObject from
-PyPI. If the native Ayatana backend cannot become ready, CodexBar automatically falls back to the Qt tray.
+## Installation environment isolation
 
-For a deterministic UI run without querying the real Codex provider:
-
-```bash
-uv run python -m codexbar --mock --gui
-```
-
-For the CLI:
-
-```bash
-uv run python -m codexbar
-```
+The supported desktop installer pins canonical user-local locations under `$HOME/.local` and `$HOME/.config`.
+This is intentional: Snap-packaged IDEs may override `XDG_DATA_HOME` inside their sandbox. Running
+`scripts/install.sh` from such a terminal must still produce the same host-user installation.
 
 ## Native-indicator diagnostics
 
@@ -107,6 +116,8 @@ See `docs/GIT_WORKFLOW.md` for repository hygiene and `AGENTS.md` for the specif
 
 ## Documentation map
 
+- `CHANGELOG.md` — released changes by version.
+- `LICENSE` — MIT license.
 - `CONSTITUTION.md` — engineering rules and invariants.
 - `PRODUCT_SPEC.md` — product scope and non-functional requirements.
 - `docs/specs/v1.0/` — normative requirements and release gates.
@@ -125,5 +136,4 @@ raw provider payloads and account identifiers must not cross the helper IPC boun
 
 ## Roadmap
 
-The next planned cycle is `REQ-DESKTOP-001`: normal desktop installation, `.desktop` integration,
-opt-in autostart, clean uninstall and packaging without development dependencies.
+The v1.0 scope is closed. Post-v1.0 work may add history/graphs, richer alerts, packaging formats or additional Linux desktop coverage, but none are part of the v1.0 release contract.

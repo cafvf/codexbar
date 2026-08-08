@@ -42,18 +42,25 @@
 - [x] TASK-029F revalidate native Ayatana indicator from the previously contaminated VS Code environment.
 
 ## REQ-DESKTOP-001 — v1.0 completion
-- [ ] TASK-030 specify supported installation/desktop integration strategy.
-- [ ] TASK-031 package launcher/desktop entry without development dependencies.
-- [ ] TASK-032 add opt-in autostart support and removal path.
-- [ ] TASK-033 validate clean install, startup, shutdown and uninstall on target Linux.
+- [x] TASK-030 specify supported user-local uv-tool/XDG installation strategy — REQ-DESKTOP-001.
+- [x] TASK-031 implement desktop entry, project icon, status and install workflow — AC-DESKTOP-001..004,007,011,013.
+- [x] TASK-032 implement opt-in autostart and managed removal path — AC-DESKTOP-005..006,008..010,012.
+- [x] TASK-033 validate clean install, desktop launch, checkout independence, autostart and uninstall on target Linux.
 
-
-### Native indicator supervision correction
-- TASK-UI-017 — require bounded `ready` handshake before accepting the Ayatana helper. [implemented]
-- TASK-UI-018 — monitor helper liveness and activate Qt fallback on unexpected exit. [implemented]
-- TASK-UI-019 — revalidate native indicator visibility/fallback on target Linux desktop. [pending target validation]
-- [x] TASK-029E add provider-independent native-indicator diagnostics with structured step reporting — AC-UI-027..031.
-- [x] TASK-029F run `--diagnose-indicator` on the target workstation; isolated failure to Snap/VS Code runtime contamination and confirmed success from a normal system terminal.
-
-- [x] TASK-029G sanitize the environment for all system-Python native indicator launches and add Snap-runtime regression tests — AC-UI-032..033.
-- [ ] TASK-029H revalidate native indicator visibility and adjacent label from both VS Code integrated terminal and normal system terminal after sanitization.
+### Release-hardening and target-regression tasks
+- [x] TASK-040 require bounded `ready` handshake before accepting the Ayatana helper.
+- [x] TASK-041 monitor helper liveness and activate Qt fallback on unexpected exit.
+- [x] TASK-042 add provider-independent native-indicator diagnostics — AC-UI-027..031.
+- [x] TASK-043 diagnose Snap/VS Code native-runtime contamination on the target workstation.
+- [x] TASK-044 sanitize all system-Python native-indicator launches — AC-UI-032..033.
+- [x] TASK-045 revalidate native indicator visibility from the VS Code integrated terminal.
+- [x] TASK-046 correct repository-wide ruff violations exposed by the target release-gate run.
+- [x] TASK-047 package `py.typed` and configure strict mypy source checking.
+- [x] TASK-048 rerun pytest/ruff/mypy/compileall gates during release hardening.
+- [x] TASK-049 reproduce and specify Snap-scoped XDG/uv installation contamination.
+- [x] TASK-050 pin canonical host-user uv/XDG locations in install/uninstall scripts.
+- [x] TASK-051 reject `$HOME/snap/` XDG homes and add regression tests.
+- [x] TASK-052 revalidate canonical installation from the VS Code/Snap terminal.
+- [x] TASK-053 remove the legacy sandbox-scoped uv tool after canonical-install validation.
+- [x] TASK-054 complete uninstall/reinstall acceptance cycle and close REQ-DESKTOP-001.
+- [x] TASK-055 align package/release metadata to version 1.0.0 and prepare release tag.

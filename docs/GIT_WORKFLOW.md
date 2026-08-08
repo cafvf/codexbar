@@ -82,3 +82,43 @@ A behavior change is not complete merely because code and tests pass. Follow `AG
 Manual target-system validation belongs in `docs/VALIDATION.md`. Record what was actually observed and
 distinguish it from automated evidence. Never claim a desktop capability was validated merely because a
 mock or headless test passed.
+
+## v1.0 release-candidate checks
+
+Before tagging the first desktop-installable release, run:
+
+```bash
+uv sync --extra dev --extra gui --extra native-indicator
+uv run pytest -ra
+uv run ruff check src tests
+uv run mypy
+uv run python -m compileall -q src
+```
+
+Then perform the target-system REQ-DESKTOP-001 validation from `docs/specs/v1.0/REQ-DESKTOP-001.md`.
+Do not create the v1.0 tag while that validation gate is still open.
+
+## Release tagging
+
+For a release candidate, first run all committed gates:
+
+```bash
+uv sync --extra dev --extra gui --extra native-indicator
+uv run pytest -ra
+uv run ruff check src tests
+uv run mypy
+uv run python -m compileall -q src
+```
+
+Then review and commit all intended release changes. Create a release tag only from a clean working tree:
+
+```bash
+git status
+git log --oneline --decorate -n 10
+git tag -a v1.0.0 -m "CodexBar 1.0.0"
+git show --stat v1.0.0
+git push origin main
+git push origin v1.0.0
+```
+
+The annotated tag version SHALL agree with `pyproject.toml` and `codexbar.__version__`.

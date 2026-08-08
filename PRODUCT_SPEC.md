@@ -1,6 +1,6 @@
 # CodexBar Product Specification
 
-Status: draft normative
+Status: v1.0 normative
 
 ## Purpose
 Provide a small Linux desktop monitor that makes the Codex usage information available at a glance,
@@ -54,7 +54,18 @@ As of the REQ-UI-002 closeout:
 - native Ayatana glance rendering is validated on Ubuntu/GNOME/Wayland with a sanitized system-Python helper;
 - Qt remains the mandatory fallback when the native helper is unavailable or unhealthy;
 - source-based use through `uv` is supported and documented;
-- system-wide installation, `.desktop`, autostart and uninstall remain future work under REQ-DESKTOP-001.
+- user-local `uv tool` installation, XDG `.desktop`, opt-in autostart and managed uninstall are validated end-to-end under REQ-DESKTOP-001.
 
 A new user cloning the repository SHALL be able to discover the supported source-based setup from
 `README.md` without relying on conversation history.
+
+
+## Distribution and desktop integration
+The v1.0 supported installation mechanism is user-local `uv tool` installation plus CodexBar-managed XDG
+artifacts. Installation SHALL not require the checkout after completion, SHALL not install development
+dependencies, SHALL leave autostart disabled by default and SHALL provide a reversible uninstall path. See
+REQ-DESKTOP-001 and ADR-004.
+
+## v1.0 release state
+REQ-USAGE-001, REQ-UI-001, REQ-UI-002 and REQ-DESKTOP-001 are validated on the target Linux workstation.
+All release gates defined in `docs/specs/v1.0/RELEASE.md` are closed.

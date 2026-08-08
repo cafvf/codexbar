@@ -50,8 +50,7 @@ outstanding for v1.0.
 The first target Linux GUI validation succeeded for tray presence, Show, panel rendering and Quit, but
 revealed a failure of AC-UI-006: primary click opened the context menu instead of toggling the panel.
 The Qt shell was changed so the context menu is no longer registered with `QSystemTrayIcon`; `Trigger`
-toggles the panel and `Context` manually pops the menu. Target revalidation is required because GNOME
-tray activation support varies by shell/extension.
+toggles the panel and `Context` manually pops the menu. This historical failure was superseded by the adaptive registered-menu design, which was later validated on the target desktop.
 
 ## REQ-UI-002 — current implementation
 - project-owned terminal-style tray icon implemented;
@@ -112,7 +111,7 @@ registration. It also lacked runtime failover if the helper subsequently exited.
 Disposition: native selection now requires an explicit JSONL `ready` handshake within a bounded startup
 interval. Failure or timeout causes immediate selection of the already validated Qt backend. While running,
 helper liveness is monitored; unexpected helper termination activates the Qt tray fallback instead of leaving
-CodexBar alive without a control surface. Target desktop revalidation remains required.
+CodexBar alive without a control surface. This historical failure was later closed by bounded readiness, runtime supervision and Qt fallback, followed by successful target validation.
 
 ## Native indicator diagnostic gate
 After target validation showed the supervised Ayatana helper falling back to Qt, a dedicated diagnostic CLI
@@ -124,7 +123,9 @@ bounded GLib-loop turn; it does not establish that the desktop shell physically 
 ## REQ-UI-002 — Snap/VS Code runtime contamination diagnosis
 Target `--diagnose-indicator` execution from the VS Code integrated terminal passed `gi-import`, `ayatana-import` and `gtk-import`, then failed before helper diagnostic completion with a dynamic-loader error referencing `/snap/core20/current/lib/x86_64-linux-gnu/libpthread.so.0` and missing `__libc_pthread_init@GLIBC_PRIVATE`. The identical diagnostic completed successfully from a normal terminal outside VS Code. This establishes inherited Snap runtime variables as the root cause rather than missing GI/Ayatana packages.
 
-The parent now sanitizes the environment before every `/usr/bin/python3` probe/helper/diagnostic launch. Target revalidation is pending from the integrated VS Code terminal; success criterion is that the native backend reaches `ready` (or at minimum the diagnostic completes) without loading Snap runtime libraries, while Qt fallback remains intact if native registration still fails for desktop-shell reasons.
+The parent now sanitizes the environment before every `/usr/bin/python3` probe/helper/diagnostic launch.
+This historical gate was subsequently revalidated successfully from the integrated VS Code terminal; the
+native backend reached readiness and rendered the weekly label while the Qt fallback remained available.
 
 
 ## REQ-UI-002 — target acceptance complete
@@ -154,7 +155,87 @@ simultaneously reported windows during this validation.
 - REQ-USAGE-001: validated.
 - REQ-UI-001: validated.
 - REQ-UI-002: validated.
-- REQ-DESKTOP-001: open; no supported system-wide installer/autostart/uninstall flow exists yet.
+- REQ-DESKTOP-001: validated end-to-end on the target Ubuntu/GNOME/Wayland workstation.
 
 The repository is currently usable through the source-based `uv` workflow documented in `README.md` and
 `docs/INSTALLATION.md`.
+
+
+## REQ-DESKTOP-001 — implementation validation
+
+Automated implementation checks cover XDG path resolution, absolute installed-launcher references,
+idempotent installation, opt-in/reversible autostart, managed-file ownership protection, status reporting
+and preservation of unrelated XDG files. The normal installer uses `uv tool install` with PySide6 and does
+not request the development extra.
+
+Target validation remains open and must confirm: clean user-local install, desktop-menu launch, tray
+behavior, installed-launcher operation after the checkout is renamed/removed, autostart enable/disable and
+clean uninstall. Until those steps pass, the v1.0 release gate remains open.
+
+### REQ-DESKTOP-001 implementation-environment result
+- `python -m pytest -ra` -> **75 passed, 1 skipped**.
+- skipped test: optional Qt GUI smoke because PySide6 is not installed in this execution environment.
+- `python -m compileall -q src` -> passed.
+- `sh -n scripts/install.sh scripts/uninstall.sh` equivalent syntax checks -> passed individually.
+- an XDG-temporary-directory CLI simulation completed install -> status -> autostart enable -> status -> uninstall and left an unrelated file intact.
+- `ruff` and `mypy` were not available in this execution environment; the target development environment should run them through the committed `dev` extra before release tagging.
+
+### REQ-DESKTOP-001 quality-gate correction
+Target development validation reported 77 passing tests but exposed two release-gate defects: repository-wide
+`ruff` violations and `mypy` treating the installed `codexbar` package as untyped because no `py.typed`
+marker/configuration directed it to the source tree. The corrective patch makes the declared quality gates
+real rather than advisory: formatting/import/modernization violations identified by the target run are
+corrected, `src/codexbar/py.typed` is packaged, and mypy is configured to check `src/codexbar` directly in
+strict mode. Target rerun of `uv run ruff check src tests` and `uv run mypy` remains required before the
+clean-install acceptance sequence continues.
+
+### REQ-DESKTOP-001 quality-gate correction — strict typing follow-up
+A second target quality-gate run kept the functional suite green (77 passed) and narrowed the remaining
+failures to strict static-analysis integration points: subprocess text-pipe typing, a Qt method-name override
+collision (`UsagePanel.render` vs `QWidget.render`), nullable Qt layout items, QByteArray-to-bytes typing,
+`QApplication.instance()` narrowing, obsolete `type: ignore` comments, and one test file resource-lifetime
+warning. The corrective patch resolves these without weakening `mypy --strict` or excluding files from
+`ruff`.
+
+The supported Python range is also made explicit as `>=3.12,<3.15`. Python 3.12–3.14 are the intended v1.0
+range; Python 3.15+ is not claimed until separately validated. The target must rerun pytest, ruff, mypy and
+compileall before continuing to installation acceptance.
+
+### REQ-DESKTOP-001 — Snap-scoped installation regression
+The first target install was launched from a Snap-packaged VS Code terminal. `HOME` remained the real user
+home, but VS Code exported `XDG_DATA_HOME=$HOME/snap/code/<revision>/.local/share`. Because uv derives its
+default tool location from XDG data paths, the initial install placed both the uv tool and XDG desktop
+assets below the VS Code Snap sandbox.
+
+Disposition: the supported installer now pins the canonical host-user XDG/uv paths
+(`$HOME/.local/share`, `$HOME/.config`, `$HOME/.local/bin`, `$HOME/.local/share/uv/tools`). Desktop path
+resolution also rejects XDG data/config homes below `$HOME/snap/`. A previously created Snap-scoped tool is
+reported for explicit cleanup after the canonical installation is validated; it is never deleted
+automatically.
+
+## REQ-DESKTOP-001 — target acceptance complete
+
+Target workstation: Ubuntu/GNOME/Wayland.
+
+The release candidate completed the full desktop-distribution acceptance cycle:
+- the repository quality gates were exercised during release hardening;
+- `scripts/install.sh` installed a canonical user-local uv tool, desktop entry and icon;
+- `~/.local/bin/codexbar desktop status` reported Installed/Launcher/Desktop entry/Icon as healthy and
+  autostart disabled;
+- the installed GUI/tray ran successfully;
+- after temporarily renaming the checkout, the installed launcher continued to run, proving checkout
+  independence;
+- autostart enable, status and disable completed successfully;
+- `scripts/uninstall.sh` removed the canonical installation;
+- checks confirmed removal of launcher, desktop entry, icon and autostart artifact;
+- reinstall restored a healthy application with autostart disabled;
+- the earlier legacy uv tool under the VS Code Snap-scoped XDG path was explicitly removed;
+- the canonical installation remained healthy afterward.
+
+Disposition: **REQ-DESKTOP-001 validated and closed.**
+
+## v1.0 release disposition
+All four v1.0 requirements are validated on the target Linux workstation. Package/release metadata is
+aligned to `1.0.0`. The remaining release procedure is repository hygiene: run the final automated gates,
+review the staged diff, commit the release changes, verify a clean working tree and create annotated tag
+`v1.0.0`.

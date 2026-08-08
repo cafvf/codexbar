@@ -5,10 +5,11 @@ import selectors
 import subprocess
 import time
 from collections.abc import Callable
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from decimal import Decimal, InvalidOperation
 from typing import Any, Protocol, TextIO, cast
 
+from codexbar import __version__
 from codexbar.domain.errors import (
     UsageAuthenticationError,
     UsageCommandError,
@@ -52,8 +53,8 @@ class SubprocessJsonRpcTransport:
             self.close()
             raise UsageSourceUnavailableError("Codex app-server stdio pipes are unavailable")
 
-        self._stdin: TextIO = self._process.stdin
-        self._stdout: TextIO = self._process.stdout
+        self._stdin = cast(TextIO, self._process.stdin)
+        self._stdout = cast(TextIO, self._process.stdout)
         self._selector = selectors.DefaultSelector()
         self._selector.register(self._stdout, selectors.EVENT_READ)
 
@@ -103,7 +104,11 @@ class SubprocessJsonRpcTransport:
 
     def _process_error(self, prefix: str) -> str:
         stderr = self._process.stderr
-        detail = stderr.read().strip() if stderr is not None and self._process.poll() is not None else ""
+        detail = (
+            stderr.read().strip()
+            if stderr is not None and self._process.poll() is not None
+            else ""
+        )
         return f"{prefix}: {detail}" if detail else prefix
 
 
@@ -119,7 +124,7 @@ class CodexAppServerProvider:
     ) -> None:
         self._transport_factory = transport_factory or SubprocessJsonRpcTransport
         self._timeout_seconds = timeout_seconds
-        self._clock = clock or (lambda: datetime.now(timezone.utc))
+        self._clock = clock or (lambda: datetime.now(UTC))
 
     def get_usage(self) -> UsageSnapshot:
         transport = self._transport_factory()
@@ -142,7 +147,7 @@ class CodexAppServerProvider:
                     "clientInfo": {
                         "name": "codexbar",
                         "title": "CodexBar",
-                        "version": "0.2.0",
+                        "version": __version__,
                     }
                 },
             }
@@ -222,7 +227,7 @@ def _parse_window(raw: JsonObject) -> UsageWindow:
         raise UsageSchemaError("resetsAt must be a Unix timestamp or null")
     else:
         try:
-            resets_at = datetime.fromtimestamp(reset_raw, tz=timezone.utc)
+            resets_at = datetime.fromtimestamp(reset_raw, tz=UTC)
         except (OverflowError, OSError, ValueError) as exc:
             raise UsageSchemaError("resetsAt is outside the supported datetime range") from exc
 

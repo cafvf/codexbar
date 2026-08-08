@@ -1,6 +1,6 @@
 # REQ-USAGE-001 — Query and present Codex usage
 
-Status: implemented core / GUI pending  
+Status: validated on target Linux workstation  
 Priority: P0  
 Release: v1.0
 

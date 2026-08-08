@@ -1,6 +1,6 @@
 # REQ-UI-001 — Linux tray presentation and refresh
 
-Status: implemented / target-desktop regression validation pending  
+Status: validated on target Linux workstation  
 Priority: P0  
 Release: v1.0
 
@@ -56,8 +56,13 @@ supported without shell extensions. Consequently, v1.0 treats direct primary act
 not as a universal Linux invariant. The invariant is that one activation exposes useful usage information
 and that a reliable Quit path is always reachable.
 
-## Validation gate
-REQ-UI-001 is not considered fully validated until its PySide6 smoke test and a manual tray interaction
+## Validation gate — closed
+REQ-UI-001 was validated on the target Ubuntu/GNOME/Wayland workstation. The adaptive registered-menu
+interaction provides the portable control surface, the detail panel refreshes correctly, and both menu and
+panel expose reliable shutdown paths. Historical activation regressions are retained in `docs/VALIDATION.md`
+as evidence rather than as open release gates.
+
+Historical criterion text follows for traceability:
 pass on the target Linux desktop with the authenticated Codex provider. Two target observations refined
 this gate: the registered menu initially consumed primary click, while removing the registered menu made
 single click inert and removed the reliable Quit surface. The adaptive registered-menu design above must

@@ -135,5 +135,21 @@ Target diagnostics showed a Snap-packaged VS Code terminal could inject `/snap/c
 Target revalidation after environment sanitization succeeded on Ubuntu/GNOME/Wayland: the Ayatana helper
 reached readiness from the previously problematic VS Code/Snap launch environment, the available weekly
 percentage rendered in the desktop bar, and menu behavior remained functional. REQ-UI-002 is therefore
-closed. The next architectural increment is REQ-DESKTOP-001; no ad-hoc installer/autostart behavior should
-be added before that requirement is specified and acceptance-tested.
+closed. REQ-DESKTOP-001 was subsequently specified, implemented and target-validated; the historical
+sequencing note is retained only to explain why desktop integration was developed after the tray contract.
+
+
+## REQ-DESKTOP-001 implementation review
+The desktop layer is intentionally a small stdlib-only boundary. It owns XDG application/icon/autostart
+files but not the uv tool environment itself. `uv tool` provides the isolated non-editable application
+installation; CodexBar writes only marked user-local desktop artifacts. Autostart is opt-in. Uninstall
+refuses to remove an unexpected desktop file occupying a managed path and never recursively deletes shared
+XDG directories. No repository path is embedded in the generated desktop entry. See ADR-004.
+
+
+## v1.0 closeout
+REQ-DESKTOP-001 completed target validation on Ubuntu/GNOME/Wayland, including canonical user-local
+installation from a Snap-contaminated VS Code terminal, installed GUI execution, checkout independence,
+autostart enable/disable, clean uninstall, reinstall and explicit removal of the legacy Snap-scoped tool.
+All v1.0 requirement gates are closed. Release metadata is aligned to 1.0.0 and the intended annotated Git
+tag is `v1.0.0`.

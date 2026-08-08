@@ -34,9 +34,10 @@ weekly remaining quotas available at a glance, without fabricating missing windo
 - AC-UI-014: the registered tray menu's summary line contains the same canonical glance string.
 - AC-UI-015: stale data remains visible and is explicitly marked stale instead of being discarded.
 
-## Validation gate
-The project icon has been observed successfully on the target desktop. The dynamic tooltip/menu glance
-and interaction behavior remain pending target-desktop validation after the adaptive-menu correction.
+## Validation gate — portable path closed
+The project icon, dynamic menu glance and adaptive interaction were validated on the target desktop.
+The native Ayatana path was subsequently validated after the helper supervision and runtime-sanitization
+work described below.
 
 ### UC-UI-006 — Native Linux adjacent label
 - AC-UI-016: when Ayatana bindings are available to `/usr/bin/python3`, CodexBar selects the native indicator backend.

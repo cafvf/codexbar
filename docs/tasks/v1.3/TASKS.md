@@ -1,6 +1,6 @@
 # v1.3 Tasks
 
-Status: history store operations in progress
+Status: storage foundation complete; runtime integration pending
 Requirement: REQ-HISTORY-001
 ADR: ADR-007
 
@@ -18,12 +18,12 @@ ADR: ADR-007
 - [x] TASK-307 query acceptance coverage.
 - [x] TASK-308 retention acceptance coverage.
 - [x] TASK-309 schema/corruption failure acceptance coverage.
-- [x] TASK-310 add acceptance tests for AC-HISTORY-029..032: absent/empty/non-empty/unreadable inspection.
-- [x] TASK-311 add acceptance tests for AC-HISTORY-033..038: explicit clear, schema preservation,
-  empty idempotency, settings isolation and corrupt-store refusal.
+- [x] TASK-310 inspection acceptance coverage.
+- [x] TASK-311 clear acceptance coverage, except AC-HISTORY-037 which remains explicitly pending until
+  runtime integration can prove that clear does not alter current in-memory usage/alert state.
 
 ## SQLite infrastructure
-- [ ] TASK-312 implement canonical XDG history path resolution with Snap-scoped fallback protection.
+- [x] TASK-312 implement canonical XDG history path resolution with Snap-scoped fallback protection.
 - [x] TASK-313 implement schema-v1 SQLite initialization and validation with foreign keys enabled.
 - [x] TASK-314 implement canonical UTC timestamp and Decimal serialization/round trip.
 - [x] TASK-315 implement deterministic normalized observation key and idempotent append transaction.
@@ -39,6 +39,8 @@ ADR: ADR-007
 - [ ] TASK-323 ensure stale fallback and provider errors never invoke history append.
 - [ ] TASK-324 isolate history append/prune failures so alerts and tray/current usage continue normally.
 - [ ] TASK-325 define deterministic maintenance/prune trigger without introducing a second sampling cadence.
+- [ ] TRACE-GAP-001 close AC-HISTORY-037 with runtime-level evidence that `history clear` does not alter
+  current in-memory usage or alert state.
 
 ## CLI
 - [ ] TASK-326 add minimal history inspection CLI.

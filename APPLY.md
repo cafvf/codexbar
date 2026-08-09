@@ -1,16 +1,15 @@
-# v1.3 TASK-310/311 + TASK-319/320
+# v1.3 TASK-312 — canonical XDG history path
 
 Tests and implementation are delivered together.
 
-This increment adds:
-- non-destructive path inspection for ABSENT / UNSUPPORTED / UNREADABLE;
-- repository inspection for READY_EMPTY / READY_NON_EMPTY;
-- schema version, count, oldest and newest observation metadata;
-- transactional history clear preserving schema/meta;
-- clear idempotency;
-- explicit refusal to treat corrupt/unsupported storage as clear/repair.
+Adds:
+- XDG_DATA_HOME-based history database path resolution;
+- fallback to `$HOME/.local/share`;
+- Snap-scoped XDG_DATA_HOME rejection;
+- no filesystem creation during path resolution;
+- explicit tracking of the remaining AC-HISTORY-037 traceability gap.
 
-No XDG path resolution, CLI commands, or refresh/runtime wiring is introduced yet.
+No runtime wiring or CLI behavior is introduced yet.
 
 Run:
 

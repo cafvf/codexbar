@@ -1,7 +1,7 @@
 # CodexBar Product Specification
 
-Status: v1.2 validated baseline; v1.3 planned
-Current validated release: 1.2.0
+Status: v1.3 validated baseline
+Current validated release: 1.3.0
 
 ## Purpose
 
@@ -14,7 +14,7 @@ monitoring behavior to be configured without source-code changes.
 CodexBar reports **what a verified Codex source exposes**. It does not promise an absolute token balance
 unless the source explicitly provides that quantity.
 
-Usage history records observations made by CodexBar. It SHALL NOT imply continuous measurement, reconstruct
+Usage history records observations made by CodexBar. It does not imply continuous measurement, reconstruct
 unobserved values, or claim that differences between observations are authoritative token-accounting data.
 
 ## Core user outcome
@@ -24,7 +24,8 @@ The user can:
 - distinguish current from stale data;
 - configure supported monitoring behavior;
 - receive transition-based LOW/EXHAUSTED alerts;
-- beginning in v1.3, retain normalized current observations locally for later inspection and analysis.
+- retain normalized CURRENT observations locally for bounded historical inspection;
+- inspect and explicitly clear local history without coupling it to settings or current usage state.
 
 ## Stable domain vocabulary
 
@@ -37,6 +38,8 @@ The user can:
 - **App settings:** validated persistent configuration feeding existing domain policy.
 - **Historical snapshot:** one persisted, eligible `Freshness.CURRENT` normalized snapshot.
 - **Historical window observation:** the normalized state of one usage window within a historical snapshot.
+- **Historical window sample:** one historical window observation together with its observation timestamp and
+  normalized source context.
 
 ## Validated release baseline
 
@@ -65,25 +68,26 @@ The user can:
 6. Isolate notification delivery failures from usage refresh.
 7. Deliver Linux desktop alerts through `notify-send` / `libnotify-bin`.
 
+### v1.3 — Remember
+1. Persist every eligible CURRENT normalized observation without raw provider payloads.
+2. Store history in schema-v1 SQLite under the canonical host-user XDG data location.
+3. Keep settings schema v1 and history schema v1 independent.
+4. Query snapshots and stable window identities with half-open `[start, end)` semantics.
+5. Retain 30 days using the exact cutoff rule `observed_at < now_utc - 30 days`.
+6. Treat snapshot metadata plus all child window observations as one atomic persistence unit.
+7. Keep STALE/provider-error fallbacks out of history.
+8. Isolate history append/prune failures from current usage, tray state and alert evaluation.
+9. Run SQLite capture/maintenance in the existing refresh worker path, not the GUI polling path.
+10. Expose non-destructive `history inspect` and explicit destructive `history clear`.
+11. Fail closed for corrupt/unsupported history instead of silently recreating it.
+12. Preserve discrete-observation semantics: no interpolation, forecasting or fabricated intermediate usage.
+
 Normative details:
 - `docs/specs/v1.0/`
 - `docs/specs/v1.1/`
 - `docs/specs/v1.2/`
-
-## Planned v1.3 — Remember
-
-v1.3 introduces persistent **local normalized usage history**.
-
-The release SHALL:
-1. persist eligible CURRENT observations without storing raw provider payloads;
-2. keep history persistence independent from settings persistence;
-3. use an explicit, versioned history schema;
-4. provide deterministic query semantics by time range and usage-window identity;
-5. apply bounded retention;
-6. contain history storage failures so current usage, tray operation and alerts remain usable;
-7. expose enough inspection/maintenance behavior to validate the stored history.
-
-`REQ-HISTORY-001` is the normative requirement.
+- `docs/specs/v1.3/REQ-HISTORY-001.md`
+- `docs/adr/ADR-007-history-persistence.md`
 
 ## Explicitly deferred beyond v1.3
 
@@ -99,7 +103,7 @@ The release SHALL:
 - account-level analytics;
 - native Linux packaging beyond the validated uv/XDG workflow.
 
-These capabilities may consume v1.3 history later but SHALL NOT silently expand v1.3.
+These capabilities may consume v1.3 history later but SHALL NOT redefine v1.3 observation semantics.
 
 ## Non-functional requirements
 
@@ -108,7 +112,8 @@ These capabilities may consume v1.3 history later but SHALL NOT silently expand 
 - Unknown source, settings and history schemas fail closed.
 - UI refresh must not block the GUI thread.
 - Automatic refreshes must not overlap.
-- User-facing timestamps are localized; internal/persisted timestamps remain timezone-aware.
+- User-facing timestamps are localized where rendered; persisted history timestamps use canonical
+  timezone-aware UTC representation.
 - Distro-native desktop bindings SHALL NOT contaminate the uv-managed environment.
 - Credentials and raw provider payloads SHALL NOT cross alert, native-helper or history boundaries.
 - Settings SHALL not become a second source of truth for usage classification.
@@ -120,10 +125,9 @@ These capabilities may consume v1.3 history later but SHALL NOT silently expand 
 
 Supported application installation remains user-local `uv tool` plus CodexBar-managed XDG artifacts.
 
-Configuration belongs under the canonical XDG configuration location.
+Configuration belongs under the canonical XDG configuration location and remains schema-v1 JSON.
 
-Historical usage is application data rather than configuration and SHALL use the canonical host-user XDG data
-location. The intended v1.3 path is:
+Historical usage is application data and uses:
 
 `$XDG_DATA_HOME/codexbar/history.sqlite3`
 
@@ -131,9 +135,12 @@ falling back to:
 
 `$HOME/.local/share/codexbar/history.sqlite3`
 
-The exact history storage schema requires an ADR before production implementation.
+Snap-scoped `XDG_DATA_HOME` values below `$HOME/snap/` fall back to the canonical host-user data location.
 
-## Current validated baseline
+History schema version 1 and its compatibility policy are recorded in ADR-007 and implemented by the SQLite
+infrastructure adapter.
+
+## Current validation state
 
 Validated on Ubuntu/GNOME/Wayland:
 - `REQ-USAGE-001`;
@@ -141,6 +148,7 @@ Validated on Ubuntu/GNOME/Wayland:
 - `REQ-UI-002`;
 - `REQ-DESKTOP-001`;
 - `REQ-SETTINGS-001`;
-- `REQ-ALERT-001`.
+- `REQ-ALERT-001`;
+- `REQ-HISTORY-001`.
 
-v1.2.0 is the current validated release.
+v1.3.0 is the current validated release.

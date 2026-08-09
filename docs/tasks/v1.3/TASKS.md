@@ -1,6 +1,6 @@
 # v1.3 Tasks
 
-Status: release close pending
+Status: complete
 Requirement: REQ-HISTORY-001
 ADR: ADR-007
 
@@ -52,4 +52,4 @@ ADR: ADR-007
 
 ## Target validation/release
 - [x] TASK-331 execute and record `docs/VALIDATION-REQ-HISTORY-001.md` on Ubuntu/GNOME/Wayland.
-- [ ] TASK-332 close traceability, validation evidence, changelog/version metadata and v1.3.0 release.
+- [x] TASK-332 close traceability, validation evidence, changelog/version metadata and v1.3.0 release.

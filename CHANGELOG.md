@@ -1,5 +1,52 @@
 # Changelog
 
+## 1.3.0 — 2026-08-09
+
+Validated local-history release of CodexBar.
+
+### Added
+- schema-v1 SQLite history for normalized CURRENT usage snapshots and child window observations;
+- canonical host-user XDG history path with Snap-scoped path protection;
+- deterministic observation identity/idempotency;
+- half-open `[start, end)` snapshot and stable-window queries;
+- fixed 30-day history retention with exact cutoff semantics and child-row cascade;
+- history inspection states for absent, ready-empty, ready-non-empty, unreadable and unsupported storage;
+- `codexbar history inspect`;
+- explicit destructive `codexbar history clear` that preserves valid schema;
+- `HistoryRepository`, historical value/read models and normalized history error taxonomy;
+- `HistoryService` and `HistoryCapturingUsageProvider` for failure-isolated runtime capture;
+- `scripts/validate_history.py` and requirement-specific target validation record;
+- history architecture/regression guards for `INV-HISTORY-001..008`.
+
+### Changed
+- normal CLI and tray provider composition now includes local history capture;
+- history append/prune executes in the existing refresh worker path instead of the GUI polling path;
+- every successful CURRENT observation is eligible for persistence;
+- pruning runs in the same history maintenance cycle; no second scheduler/cadence is introduced;
+- application startup degrades gracefully if history storage cannot be initialized;
+- release gates include `scripts` for Ruff and compileall.
+
+### Compatibility and safety
+- settings schema remains version 1 and gains no history fields;
+- v1.0 CURRENT/STALE semantics remain unchanged;
+- v1.2 alert transition/deduplication semantics remain unchanged;
+- STALE and provider-error fallback paths do not create new historical observations;
+- history storage failure does not fabricate source failure, stale state or suppress alert evaluation;
+- history clear does not reset current in-memory usage or alert deduplication state;
+- corrupt/unsupported history fails closed and is not silently deleted/recreated;
+- raw provider payloads, credentials and account identifiers are not persisted;
+- history is observation data only and does not imply continuous measurement or token accounting.
+
+### Validation
+- repository-wide pytest, Ruff, strict mypy and compileall gates passed;
+- exact retention boundary, query boundaries, restart persistence, clear and corruption handling are covered;
+- Ubuntu/GNOME/Wayland validation confirmed canonical XDG storage, persistence across processes, CLI clear,
+  controlled failure isolation and responsive tray operation with history enabled.
+
+See `docs/specs/v1.3/RELEASE.md`, `docs/TRACEABILITY-REQ-HISTORY-001.md`,
+`docs/VALIDATION-REQ-HISTORY-001.md` and `docs/adr/ADR-007-history-persistence.md`.
+
+
 ## 1.2.0 — 2026-08-09
 
 Validated alerting release of CodexBar.

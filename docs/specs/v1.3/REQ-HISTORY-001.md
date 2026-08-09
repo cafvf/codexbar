@@ -1,6 +1,6 @@
 # REQ-HISTORY-001 — Persistent local normalized usage history
 
-Status: implementation-ready
+Status: validated and closed
 Priority: P0
 Release: v1.3
 Change taxonomy: EVOLUTION
@@ -21,7 +21,7 @@ credentials or account identifiers.
 4. v1.3 includes an explicit destructive **`history clear`** operation.
 5. **Every eligible CURRENT snapshot** is persisted; no secondary sampling cadence is introduced.
 
-There are no remaining behavioral decisions blocking TDD.
+All behavioral decisions are closed. Implementation, automated evidence and target validation are complete; only release-close metadata/documentation remains.
 
 ## Definitions
 

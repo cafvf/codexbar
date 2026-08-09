@@ -5,7 +5,7 @@ authenticated Codex app-server and presents remaining quota at a glance.
 
 ## Current project status
 
-Current release: **1.2.0**.
+Current release: **1.3.0**.
 
 Validated on Ubuntu/GNOME/Wayland:
 - `REQ-USAGE-001` — real Codex usage provider: **validated**.
@@ -14,8 +14,9 @@ Validated on Ubuntu/GNOME/Wayland:
 - `REQ-DESKTOP-001` — user-local installation, autostart and uninstall: **validated**.
 - `REQ-SETTINGS-001` — persistent settings and runtime application: **validated**.
 - `REQ-ALERT-001` — transition-based LOW/EXHAUSTED desktop alerts: **validated**.
+- `REQ-HISTORY-001` — bounded local normalized usage history: **validated**.
 
-CodexBar 1.2.0 preserves the v1.0/v1.1 baseline and adds real transition-based desktop notifications.
+CodexBar 1.3.0 is the validated **Remember** release: bounded local normalized usage history is now part of the supported product contract.
 
 ## Prerequisites
 
@@ -58,7 +59,7 @@ Open **Settings** from the tray menu to edit:
 - automatic refresh interval;
 - notifications enabled.
 
-Alert behavior in v1.2:
+Alert behavior:
 - first observation is a silent baseline;
 - `AVAILABLE -> LOW` alerts;
 - `LOW -> EXHAUSTED` alerts;
@@ -73,6 +74,43 @@ CLI settings:
 codexbar settings show
 codexbar settings reset
 ```
+
+## Usage history
+
+The v1.3 implementation stores every eligible `Freshness.CURRENT` normalized snapshot in a local
+schema-v1 SQLite database. STALE fallback data is never inserted as a new historical observation.
+
+Default history location:
+
+```text
+$XDG_DATA_HOME/codexbar/history.sqlite3
+```
+
+with host-user fallback:
+
+```text
+$HOME/.local/share/codexbar/history.sqlite3
+```
+
+Snap-scoped XDG data paths are rejected in favor of the host-user fallback.
+
+History policy:
+- fixed 30-day retention;
+- observations strictly older than `now_utc - 30 days` are pruned;
+- the exact cutoff observation is retained;
+- history is discrete observation data, not continuous token accounting;
+- history failures are isolated from successful current usage and alerts;
+- raw provider payloads, account identifiers and credentials are not persisted.
+
+Inspection and maintenance:
+
+```bash
+codexbar history inspect
+codexbar history clear
+```
+
+`history clear` is destructive for stored observations but preserves the valid database schema. It is
+idempotent, does not modify settings, and is not used as implicit recovery for corrupt/unsupported storage.
 
 ## Development and release checks
 
@@ -90,24 +128,43 @@ Notification diagnostics:
 uv run python scripts/diagnose_notifications.py
 ```
 
+History validation:
+
+```bash
+uv run python scripts/validate_history.py all
+```
+
 ## Documentation map
 
 - `CHANGELOG.md` — release history.
 - `CONSTITUTION.md` — engineering rules and invariants.
-- `PRODUCT_SPEC.md` — product baseline.
-- `docs/specs/v1.2/` — v1.2 alert requirement and release gates.
-- `docs/TRACEABILITY-REQ-ALERT-001.md` — detailed v1.2 traceability.
-- `docs/VALIDATION-REQ-ALERT-001.md` — v1.2 target validation.
-- `docs/adr/ADR-006-linux-notifications.md` — final Linux notification transport decision.
-- `docs/INSTALLATION.md` — installation and troubleshooting.
-- `docs/GIT_WORKFLOW.md` — repository workflow.
+- `PRODUCT_SPEC.md` — product baseline and release evolution.
+- `docs/specs/v1.3/` — v1.3 history requirement and release gates.
+- `docs/TRACEABILITY-REQ-HISTORY-001.md` — detailed v1.3 traceability.
+- `docs/VALIDATION-REQ-HISTORY-001.md` — v1.3 target validation.
+- `docs/adr/ADR-007-history-persistence.md` — SQLite/XDG persistence decision and as-built architecture.
+- `docs/INSTALLATION.md` — installation, history data and troubleshooting.
+- `docs/GIT_WORKFLOW.md` — repository workflow and release gates.
+- `docs/RELEASE-CHECKLIST-v1.3.0.md` — final v1.3.0 release-close checklist.
+
+Earlier release-specific traceability and validation records remain authoritative for v1.0-v1.2.
 
 ## Security boundary
 
-CodexBar does not manage Codex credentials. Notification events contain normalized window state only; raw
-provider payloads, account identifiers and credentials do not cross the notification boundary.
+CodexBar does not manage Codex credentials. Notification events and history persistence consume normalized
+domain data only; raw provider payloads, account identifiers and credentials do not cross those boundaries.
 
 ## Roadmap
 
-The v1.2 scope is closed. Later candidates include usage history/charts, additional desktop targets and
-packaging formats; none are part of the v1.2 contract.
+v1.3 is a data-foundation release: **Remember**.
+
+Explicitly deferred beyond v1.3:
+- usage-rate analytics and trend summaries;
+- prediction/forecasting;
+- historical charts/dashboard;
+- richer visualization of current state;
+- cloud/remote history;
+- account-level analytics.
+
+The next product design phase should use the v1.3 history read model rather than redefining observation
+semantics.

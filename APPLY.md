@@ -1,21 +1,32 @@
-# v1.3 TASK-328/329 — architecture and regression evidence
+# CodexBar v1.3.0 release-close package
 
-Tests only; no production behavior changes.
+This package applies the approved documentation coherence changes and the atomic source metadata bump
+from 1.2.0 to 1.3.0.
 
-Adds:
-- direct automated evidence for INV-HISTORY-001..008;
-- GUI-thread/performance guard preventing history storage from returning to TrayController;
-- confinement test for the concrete SQLite adapter;
-- explicit v1.1 settings schema-v1 regression checks;
-- settings default/policy regression checks;
-- v1.0 CURRENT -> STALE snapshot contract regression;
-- proof that history projection does not mutate current UsageSnapshot semantics.
+It intentionally does NOT include `uv.lock`: regenerate that machine-generated file locally after extraction.
 
-Run the complete gate:
+## Apply
+
+Extract over the repository root, then run:
 
 ```bash
+uv lock
+uv sync --extra dev --extra gui --extra native-indicator
+
 uv run pytest -ra
 uv run ruff check src tests scripts
 uv run mypy
 uv run python -m compileall -q src scripts
+
+git diff --check
+git status
+git diff --stat
+git diff
 ```
+
+Verify that `uv.lock` now contains the local `codexbar` project at version `1.3.0`.
+
+Do not commit or tag if any gate fails.
+
+If all gates pass, stage all intended release-close files including `uv.lock`, inspect the staged diff,
+commit with `release: close v1.3.0`, then create annotated tag `v1.3.0`.

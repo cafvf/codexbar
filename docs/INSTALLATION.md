@@ -1,6 +1,8 @@
-# Installation, desktop integration, settings and uninstall
+# Installation, desktop integration, settings, history and uninstall
 
-CodexBar 1.2 uses a user-local `uv tool` installation. The installed application does **not** depend on the
+CodexBar 1.3.0 is the current validated release.
+
+CodexBar uses a user-local `uv tool` installation. The installed application does **not** depend on the
 source checkout after installation.
 
 ## Prerequisites
@@ -9,7 +11,7 @@ Required:
 - Linux;
 - local Codex installed and authenticated;
 - `uv` available on `PATH`;
-- `notify-send` for v1.2 desktop alerts.
+- `notify-send` for desktop alerts.
 
 On Debian/Ubuntu-family systems:
 
@@ -49,10 +51,16 @@ command -v notify-send
 "$(uv tool dir --bin)/codexbar" --gui
 ```
 
-For notification diagnostics from a source/release tree:
+Notification diagnostics from a source/release tree:
 
 ```bash
 uv run python scripts/diagnose_notifications.py
+```
+
+History validation from a source/release tree:
+
+```bash
+uv run python scripts/validate_history.py all
 ```
 
 ## Settings
@@ -62,8 +70,8 @@ Tray Settings controls:
 - refresh interval — default `60` seconds, valid `10..3600`;
 - notifications enabled — default `true`.
 
-When notifications are enabled, v1.2 emits transition-based LOW/EXHAUSTED desktop notifications.
-Repeated unchanged constrained states are deduplicated.
+Notifications emit transition-based LOW/EXHAUSTED desktop notifications. Repeated unchanged constrained
+states are deduplicated.
 
 CLI:
 
@@ -72,7 +80,60 @@ CLI:
 "$(uv tool dir --bin)/codexbar" settings reset
 ```
 
-Settings remain schema-v1 JSON under the canonical XDG config location.
+Settings remain schema-v1 JSON under the canonical host-user XDG config location.
+
+## Usage history
+
+The v1.3 implementation persists normalized CURRENT usage observations to schema-v1 SQLite.
+
+History path:
+
+```text
+$XDG_DATA_HOME/codexbar/history.sqlite3
+```
+
+Fallback:
+
+```text
+$HOME/.local/share/codexbar/history.sqlite3
+```
+
+An `XDG_DATA_HOME` located below `$HOME/snap/` is rejected in favor of the host-user fallback.
+
+Inspect:
+
+```bash
+"$(uv tool dir --bin)/codexbar" history inspect
+```
+
+Possible states:
+- `absent`;
+- `ready_empty`;
+- `ready_non_empty`;
+- `unreadable`;
+- `unsupported`.
+
+Inspection is non-destructive. Inspecting an absent history path does not create a database.
+
+Clear stored observations:
+
+```bash
+"$(uv tool dir --bin)/codexbar" history clear
+```
+
+`history clear`:
+- preserves the valid schema;
+- is idempotent;
+- succeeds when history is absent/already empty;
+- does not modify settings or current runtime state;
+- refuses corrupt/unsupported storage instead of replacing it.
+
+Retention is fixed at 30 days in v1.3. Every eligible CURRENT observation is offered to history; STALE
+fallback and provider errors do not create new observations.
+
+History data is intentionally retained independently of desktop integration and tool uninstall. If the user
+wants to remove observations, run `history clear` before uninstall or remove the history database explicitly
+after the application is no longer running.
 
 ## Autostart
 
@@ -102,7 +163,7 @@ or, without the checkout:
 uv tool uninstall codexbar
 ```
 
-Persistent settings are user data and are not removed by desktop integration cleanup.
+Persistent settings and history are user data and are not removed by desktop integration cleanup.
 
 ## Development/release gate
 

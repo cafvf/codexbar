@@ -1,6 +1,6 @@
 # ADR-007 — Historical usage persistence
 
-Status: accepted
+Status: accepted; as-built confirmed
 Date: 2026-08-09
 Release: v1.3
 Requirement: REQ-HISTORY-001
@@ -77,7 +77,7 @@ Accepted because:
 
 Schema version: **1**.
 
-Recommended physical schema:
+Implemented physical schema:
 
 ```sql
 CREATE TABLE history_meta (
@@ -183,10 +183,9 @@ Rationale:
 - fewer auxiliary files;
 - no evidence currently justifies WAL complexity.
 
-Use explicit transactions.
+Use one transaction scope per mutating operation. The Python adapter implements this with the `sqlite3.Connection` context manager, which commits on successful exit and rolls back on database exceptions; no manual `BEGIN` is required for the current single-writer design.
 
-Durability PRAGMAs should remain at safe SQLite defaults unless profiling produces a documented reason to
-change them.
+Durability PRAGMAs remain at safe SQLite defaults unless profiling produces a documented reason to change them.
 
 ## Schema handling and migration policy
 
@@ -301,9 +300,16 @@ Costs:
 - requires database-focused tests and migrations policy;
 - future packaging must preserve host-user data semantics.
 
-## Follow-up
+## As-built confirmation
 
-Implementation tasks are in `docs/tasks/v1.3/TASKS.md`.
+The v1.3 implementation follows this decision with:
+- `application/history.py` for normalized history contracts and port;
+- `application/history_runtime.py` for failure-isolated worker-path capture/maintenance;
+- `infrastructure/history_sqlite.py` for schema-v1 SQLite storage;
+- `infrastructure/history_paths.py` for canonical XDG data resolution;
+- CLI composition in `codexbar.__main__` for inspect/clear and normal provider wrapping.
+
+Target validation is recorded in `docs/VALIDATION-REQ-HISTORY-001.md`.
 
 A future analytics release may add read-side use cases and indexes, but must not redefine v1.3 observation
 semantics.

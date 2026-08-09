@@ -9,6 +9,7 @@ from codexbar.application.history import (
     HistoryError,
     HistoryRepository,
 )
+from codexbar.application.ports import UsageProvider
 from codexbar.domain.models import Freshness, UsageSnapshot
 
 _HISTORY_RETENTION = timedelta(days=30)
@@ -45,10 +46,18 @@ class HistoryService:
 
         try:
             self._repository.append(HistoricalSnapshot.from_usage_snapshot(snapshot))
-            pruned = self._repository.prune(self._cutoff())
         except HistoryError as exc:
             self._last_result = HistoryMaintenanceResult(
                 captured=False,
+                diagnostic=exc,
+            )
+            return self._last_result
+
+        try:
+            pruned = self._repository.prune(self._cutoff())
+        except HistoryError as exc:
+            self._last_result = HistoryMaintenanceResult(
+                captured=True,
                 diagnostic=exc,
             )
             return self._last_result
@@ -64,3 +73,20 @@ class HistoryService:
         if now.tzinfo is None or now.utcoffset() is None:
             raise ValueError("history maintenance clock must be timezone-aware")
         return now.astimezone(UTC) - _HISTORY_RETENTION
+
+
+class HistoryCapturingUsageProvider:
+    """Run history persistence in the same worker call as the real provider."""
+
+    def __init__(
+        self,
+        provider: UsageProvider,
+        history_service: HistoryService,
+    ) -> None:
+        self._provider = provider
+        self._history_service = history_service
+
+    def get_usage(self) -> UsageSnapshot:
+        snapshot = self._provider.get_usage()
+        self._history_service.process(snapshot)
+        return snapshot

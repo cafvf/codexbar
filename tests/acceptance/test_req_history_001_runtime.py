@@ -13,12 +13,15 @@ from codexbar.application.history import (
     HistoryState,
     HistoryWriteError,
 )
-from codexbar.application.history_runtime import HistoryService
+from codexbar.application.history_runtime import (
+    HistoryCapturingUsageProvider,
+    HistoryService,
+)
 from codexbar.application.refresh import RefreshCoordinator
 from codexbar.application.use_cases import GetCurrentUsage
+from codexbar.domain.errors import UsageSourceError
 from codexbar.domain.models import (
     Fraction,
-    Freshness,
     UsageSnapshot,
     UsageSource,
     UsageWindow,
@@ -96,7 +99,7 @@ class RecordingHistoryRepository(HistoryRepository):
         self.cleared += 1
 
 
-def snapshot(remaining: str, *, freshness: Freshness = Freshness.CURRENT) -> UsageSnapshot:
+def snapshot(remaining: str) -> UsageSnapshot:
     return UsageSnapshot(
         windows=(
             UsageWindow(
@@ -107,7 +110,6 @@ def snapshot(remaining: str, *, freshness: Freshness = Freshness.CURRENT) -> Usa
         ),
         observed_at=T0,
         source=UsageSource.MOCK,
-        freshness=freshness,
     )
 
 
@@ -116,13 +118,18 @@ def refresh_once(controller: TrayController):
     return controller.poll()
 
 
-def test_task_322_current_refresh_is_offered_to_history_and_pruned() -> None:
+def wrapped_provider(repository, items):
+    return HistoryCapturingUsageProvider(
+        SequenceProvider(items),
+        HistoryService(repository, clock=lambda: T0),
+    )
+
+
+def test_task_322_current_refresh_is_captured_and_pruned_in_worker_path() -> None:
     repository = RecordingHistoryRepository()
-    history = HistoryService(repository, clock=lambda: T0)
     controller = TrayController(
-        RefreshCoordinator(GetCurrentUsage(SequenceProvider([snapshot("0.80")]))),
+        RefreshCoordinator(GetCurrentUsage(wrapped_provider(repository, [snapshot("0.80")]))),
         executor=ImmediateExecutor(),
-        history_service=history,
     )
 
     state = refresh_once(controller)
@@ -132,24 +139,21 @@ def test_task_322_current_refresh_is_offered_to_history_and_pruned() -> None:
     assert repository.cutoffs == [T0 - timedelta(days=30)]
 
 
-def test_task_323_stale_fallback_is_never_offered_to_history() -> None:
-    from codexbar.domain.errors import UsageSourceError
-
+def test_task_323_provider_error_stale_fallback_is_not_captured_again() -> None:
     repository = RecordingHistoryRepository()
-    history = HistoryService(repository, clock=lambda: T0)
     controller = TrayController(
         RefreshCoordinator(
             GetCurrentUsage(
-                SequenceProvider(
+                wrapped_provider(
+                    repository,
                     [
                         snapshot("0.80"),
                         UsageSourceError("provider unavailable"),
-                    ]
+                    ],
                 )
             )
         ),
         executor=ImmediateExecutor(),
-        history_service=history,
     )
 
     refresh_once(controller)
@@ -160,23 +164,19 @@ def test_task_323_stale_fallback_is_never_offered_to_history() -> None:
     assert len(repository.cutoffs) == 1
 
 
-def test_task_324_history_append_failure_does_not_break_current_state_or_alerts() -> None:
+def test_task_324_append_failure_does_not_break_current_state_or_alerts() -> None:
     repository = RecordingHistoryRepository(fail_append=True)
-    history = HistoryService(repository, clock=lambda: T0)
     notifier = RecordingNotifier()
     controller = TrayController(
         RefreshCoordinator(
             GetCurrentUsage(
-                SequenceProvider(
-                    [
-                        snapshot("0.80"),
-                        snapshot("0.10"),
-                    ]
+                wrapped_provider(
+                    repository,
+                    [snapshot("0.80"), snapshot("0.10")],
                 )
             )
         ),
         executor=ImmediateExecutor(),
-        history_service=history,
         alert_service=AlertService(notifier),
     )
 
@@ -188,26 +188,21 @@ def test_task_324_history_append_failure_does_not_break_current_state_or_alerts(
     assert second.usage is not None
     assert second.usage.windows[0].percent_left == 10
     assert [event.state for event in notifier.events] == [UsageWindowState.LOW]
-    assert history.last_result.diagnostic is not None
 
 
-def test_task_324_history_prune_failure_does_not_break_current_state_or_alerts() -> None:
+def test_task_324_prune_failure_does_not_break_current_state_or_alerts() -> None:
     repository = RecordingHistoryRepository(fail_prune=True)
-    history = HistoryService(repository, clock=lambda: T0)
     notifier = RecordingNotifier()
     controller = TrayController(
         RefreshCoordinator(
             GetCurrentUsage(
-                SequenceProvider(
-                    [
-                        snapshot("0.80"),
-                        snapshot("0.10"),
-                    ]
+                wrapped_provider(
+                    repository,
+                    [snapshot("0.80"), snapshot("0.10")],
                 )
             )
         ),
         executor=ImmediateExecutor(),
-        history_service=history,
         alert_service=AlertService(notifier),
     )
 
@@ -216,27 +211,25 @@ def test_task_324_history_prune_failure_does_not_break_current_state_or_alerts()
 
     assert state.phase is TrayPhase.FRESH
     assert [event.state for event in notifier.events] == [UsageWindowState.LOW]
-    assert history.last_result.diagnostic is not None
 
 
 def test_ac_history_037_clear_does_not_change_current_or_alert_runtime_state() -> None:
     repository = RecordingHistoryRepository()
-    history = HistoryService(repository, clock=lambda: T0)
     notifier = RecordingNotifier()
     controller = TrayController(
         RefreshCoordinator(
             GetCurrentUsage(
-                SequenceProvider(
+                wrapped_provider(
+                    repository,
                     [
                         snapshot("0.80"),
                         snapshot("0.10"),
                         snapshot("0.09"),
-                    ]
+                    ],
                 )
             )
         ),
         executor=ImmediateExecutor(),
-        history_service=history,
         alert_service=AlertService(notifier),
     )
 
@@ -250,5 +243,4 @@ def test_ac_history_037_clear_does_not_change_current_or_alert_runtime_state() -
     assert unchanged_low_state.phase is TrayPhase.FRESH
     assert unchanged_low_state.usage is not None
     assert unchanged_low_state.usage.windows[0].percent_left == 9
-    # Alert tracker must remain LOW across history clear; no replay.
     assert [event.state for event in notifier.events] == [UsageWindowState.LOW]

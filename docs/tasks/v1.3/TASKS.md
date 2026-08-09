@@ -1,6 +1,6 @@
 # v1.3 Tasks
 
-Status: runtime history integration complete; CLI/architecture validation pending
+Status: application composition complete; architecture/regression validation pending
 Requirement: REQ-HISTORY-001
 ADR: ADR-007
 
@@ -34,16 +34,17 @@ ADR: ADR-007
 - [x] TASK-321 normalized storage failures.
 
 ## Runtime integration
-- [x] TASK-322 integrate history capture after successful refresh completion.
-- [x] TASK-323 ensure STALE/provider failure never produces a new historical observation.
+- [x] TASK-322 capture history in the refresh worker path after a successful provider observation.
+- [x] TASK-323 ensure provider failure/STALE fallback never creates a second historical observation.
 - [x] TASK-324 isolate append/prune failures from tray/current usage and alerts.
-- [x] TASK-325 perform pruning in the same CURRENT maintenance cycle; no second sampling/scheduler cadence.
-- [x] TRACE-GAP-001 close AC-HISTORY-037 with runtime evidence that history clear leaves current state and
-  alert deduplication state unchanged.
+- [x] TASK-325 perform pruning in the same CURRENT worker maintenance cycle; no second scheduler cadence.
+- [x] TRACE-GAP-001 / AC-HISTORY-037: history clear leaves current state and alert deduplication unchanged.
 
-## CLI
-- [ ] TASK-326 add minimal history inspection CLI.
-- [ ] TASK-327 add explicit destructive `history clear` CLI with documented semantics and exit codes.
+## CLI/composition
+- [x] TASK-326 add minimal `history inspect` CLI with absent/ready/unreadable/unsupported reporting.
+- [x] TASK-327 add explicit destructive `history clear` CLI with documented exit behavior and wire the
+  canonical SQLite history service into normal usage/tray provider composition.
+- [x] PERF-GUARD-001 history SQLite I/O runs in the existing refresh worker path, not `TrayController.poll()`.
 
 ## Architecture/regression
 - [ ] TASK-328 add INV-HISTORY-001..008 architecture tests.

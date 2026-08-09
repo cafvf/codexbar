@@ -14,7 +14,10 @@ from codexbar.application.history import (
     HistoryState,
     HistoryWriteError,
 )
-from codexbar.application.history_runtime import HistoryService
+from codexbar.application.history_runtime import (
+    HistoryCapturingUsageProvider,
+    HistoryService,
+)
 from codexbar.domain.models import (
     Fraction,
     Freshness,
@@ -52,6 +55,14 @@ class Repo(HistoryRepository):
         pass
 
 
+class Provider:
+    def __init__(self, value: UsageSnapshot) -> None:
+        self._value = value
+
+    def get_usage(self) -> UsageSnapshot:
+        return self._value
+
+
 def snapshot(freshness: Freshness = Freshness.CURRENT) -> UsageSnapshot:
     return UsageSnapshot(
         windows=(
@@ -76,6 +87,17 @@ def test_history_service_reports_capture_and_prune_count() -> None:
     assert result.diagnostic is None
     assert repo.append_count == 1
     assert repo.prune_count == 1
+
+
+def test_history_service_reports_capture_when_only_prune_fails() -> None:
+    class FailingRepo(Repo):
+        def prune(self, cutoff: datetime) -> int:
+            raise HistoryWriteError("prune failed")
+
+    result = HistoryService(FailingRepo(), clock=lambda: T0).process(snapshot())
+
+    assert result.captured
+    assert isinstance(result.diagnostic, HistoryWriteError)
 
 
 def test_history_service_ignores_stale_without_maintenance() -> None:
@@ -106,3 +128,17 @@ def test_history_service_rejects_naive_maintenance_clock() -> None:
 
     with pytest.raises(ValueError, match="timezone-aware"):
         service.process(snapshot())
+
+
+def test_history_capturing_provider_runs_service_with_provider_result() -> None:
+    repo = Repo()
+    wrapped = HistoryCapturingUsageProvider(
+        Provider(snapshot()),
+        HistoryService(repo, clock=lambda: T0),
+    )
+
+    result = wrapped.get_usage()
+
+    assert result == snapshot()
+    assert repo.append_count == 1
+    assert repo.prune_count == 1

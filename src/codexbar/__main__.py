@@ -4,10 +4,18 @@ import argparse
 import sys
 from decimal import Decimal
 
+from codexbar.application.history import HistoryError, HistoryState
+from codexbar.application.history_runtime import (
+    HistoryCapturingUsageProvider,
+    HistoryService,
+)
+from codexbar.application.ports import UsageProvider
 from codexbar.application.settings import GetSettings, ResetSettings, SettingsLoadResult
 from codexbar.application.use_cases import GetCurrentUsage
 from codexbar.domain.errors import CodexBarError, SettingsError
 from codexbar.infrastructure.app_server import CodexAppServerProvider
+from codexbar.infrastructure.history_paths import history_database_path
+from codexbar.infrastructure.history_sqlite import SqliteHistoryRepository
 from codexbar.infrastructure.mock_provider import MockUsageProvider
 from codexbar.infrastructure.settings import JsonSettingsRepository
 from codexbar.ui.viewmodel import UsageViewModel
@@ -54,6 +62,17 @@ def build_parser() -> argparse.ArgumentParser:
     settings_sub.add_parser("show", help="show effective settings and their origin")
     settings_sub.add_parser("reset", help="reset persistent settings to defaults")
 
+    history = subparsers.add_parser(
+        "history",
+        help="inspect or clear persistent CodexBar usage history",
+    )
+    history_sub = history.add_subparsers(dest="history_command", required=True)
+    history_sub.add_parser("inspect", help="inspect local usage-history storage")
+    history_sub.add_parser(
+        "clear",
+        help="destructively clear all stored usage history while preserving the schema",
+    )
+
     return parser
 
 
@@ -92,6 +111,63 @@ def _run_settings(command: str) -> int:
         return 2
 
     raise AssertionError(f"unsupported settings command: {command}")
+
+
+def _print_history_inspection() -> int:
+    path = history_database_path()
+    inspection = SqliteHistoryRepository.inspect_path(path)
+
+    print(f"Path: {inspection.path}")
+    print(f"State: {inspection.state.value}")
+    if inspection.schema_version is not None:
+        print(f"Schema: {inspection.schema_version}")
+    if inspection.snapshot_count is not None:
+        print(f"Snapshots: {inspection.snapshot_count}")
+    if inspection.oldest_observed_at is not None:
+        print(f"Oldest: {inspection.oldest_observed_at.isoformat()}")
+    if inspection.newest_observed_at is not None:
+        print(f"Newest: {inspection.newest_observed_at.isoformat()}")
+    if inspection.diagnostic is not None:
+        print(f"Diagnostic: {inspection.diagnostic}")
+
+    return (
+        2
+        if inspection.state in {HistoryState.UNREADABLE, HistoryState.UNSUPPORTED}
+        else 0
+    )
+
+
+def _clear_history() -> int:
+    path = history_database_path()
+    inspection = SqliteHistoryRepository.inspect_path(path)
+
+    if inspection.state is HistoryState.ABSENT:
+        print("History already empty (database absent).")
+        return 0
+    if inspection.state in {HistoryState.UNREADABLE, HistoryState.UNSUPPORTED}:
+        print(
+            f"CodexBar: cannot clear history in state {inspection.state.value}: "
+            f"{inspection.diagnostic or 'unknown history error'}",
+            file=sys.stderr,
+        )
+        return 2
+
+    try:
+        SqliteHistoryRepository(path).clear()
+    except HistoryError as exc:
+        print(f"CodexBar: {exc}", file=sys.stderr)
+        return 2
+
+    print("Usage history cleared.")
+    return 0
+
+
+def _run_history(command: str) -> int:
+    if command == "inspect":
+        return _print_history_inspection()
+    if command == "clear":
+        return _clear_history()
+    raise AssertionError(f"unsupported history command: {command}")
 
 
 def _run_desktop(args: argparse.Namespace) -> int:
@@ -164,7 +240,16 @@ def _run_indicator_diagnostics() -> int:
     return report.exit_code or 2
 
 
-def _print_usage(provider: MockUsageProvider | CodexAppServerProvider) -> int:
+def _with_history(provider: UsageProvider) -> UsageProvider:
+    try:
+        repository = SqliteHistoryRepository(history_database_path())
+    except HistoryError as exc:
+        print(f"CodexBar history disabled: {exc}", file=sys.stderr)
+        return provider
+    return HistoryCapturingUsageProvider(provider, HistoryService(repository))
+
+
+def _print_usage(provider: UsageProvider) -> int:
     try:
         snapshot = GetCurrentUsage(provider).execute()
     except CodexBarError as exc:
@@ -197,10 +282,16 @@ def main(argv: list[str] | None = None) -> int:
     if args.command == "settings":
         return _run_settings(args.settings_command)
 
+    if args.command == "history":
+        return _run_history(args.history_command)
+
     if args.diagnose_indicator:
         return _run_indicator_diagnostics()
 
-    provider = MockUsageProvider() if args.mock else CodexAppServerProvider()
+    base_provider: UsageProvider = (
+        MockUsageProvider() if args.mock else CodexAppServerProvider()
+    )
+    provider = _with_history(base_provider)
 
     if args.gui:
         try:

@@ -1,6 +1,6 @@
 # v1.3 Tasks
 
-Status: application composition complete; architecture/regression validation pending
+Status: architecture/regression validation complete; final gate/target validation pending
 Requirement: REQ-HISTORY-001
 ADR: ADR-007
 
@@ -38,18 +38,18 @@ ADR: ADR-007
 - [x] TASK-323 ensure provider failure/STALE fallback never creates a second historical observation.
 - [x] TASK-324 isolate append/prune failures from tray/current usage and alerts.
 - [x] TASK-325 perform pruning in the same CURRENT worker maintenance cycle; no second scheduler cadence.
-- [x] TRACE-GAP-001 / AC-HISTORY-037: history clear leaves current state and alert deduplication unchanged.
+- [x] TRACE-GAP-001 / AC-HISTORY-037 closed with runtime evidence.
 
 ## CLI/composition
-- [x] TASK-326 add minimal `history inspect` CLI with absent/ready/unreadable/unsupported reporting.
-- [x] TASK-327 add explicit destructive `history clear` CLI with documented exit behavior and wire the
-  canonical SQLite history service into normal usage/tray provider composition.
+- [x] TASK-326 add minimal `history inspect` CLI.
+- [x] TASK-327 add explicit destructive `history clear` CLI and canonical SQLite runtime composition.
 - [x] PERF-GUARD-001 history SQLite I/O runs in the existing refresh worker path, not `TrayController.poll()`.
 
 ## Architecture/regression
-- [ ] TASK-328 add INV-HISTORY-001..008 architecture tests.
-- [ ] TASK-329 verify settings schema v1 and all v1.0-v1.2 contracts remain unchanged.
-- [ ] TASK-330 run complete pytest/ruff/mypy/compileall gates.
+- [x] TASK-328 add automated evidence for INV-HISTORY-001..008 plus the GUI-thread storage guard.
+- [x] TASK-329 add explicit regression evidence that settings schema v1, settings defaults/policy and
+  v1.0 current/stale snapshot semantics remain unchanged.
+- [ ] TASK-330 run and record the complete pytest/ruff/mypy/compileall release gate.
 
 ## Target validation/release
 - [ ] TASK-331 validate persistence across restart, 30-day retention boundary, inspection, clear and

@@ -1,6 +1,6 @@
 # v1.3 Tasks
 
-Status: architecture/regression validation complete; final gate/target validation pending
+Status: release close pending
 Requirement: REQ-HISTORY-001
 ADR: ADR-007
 
@@ -46,12 +46,10 @@ ADR: ADR-007
 - [x] PERF-GUARD-001 history SQLite I/O runs in the existing refresh worker path, not `TrayController.poll()`.
 
 ## Architecture/regression
-- [x] TASK-328 add automated evidence for INV-HISTORY-001..008 plus the GUI-thread storage guard.
-- [x] TASK-329 add explicit regression evidence that settings schema v1, settings defaults/policy and
-  v1.0 current/stale snapshot semantics remain unchanged.
-- [ ] TASK-330 run and record the complete pytest/ruff/mypy/compileall release gate.
+- [x] TASK-328 automated evidence for INV-HISTORY-001..008 plus GUI-thread storage guard.
+- [x] TASK-329 explicit v1.0-v1.2 regression evidence.
+- [x] TASK-330 complete pytest/ruff/mypy/compileall gate passed before target validation.
 
 ## Target validation/release
-- [ ] TASK-331 validate persistence across restart, 30-day retention boundary, inspection, clear and
-  history-failure isolation on Ubuntu/GNOME/Wayland.
+- [x] TASK-331 execute and record `docs/VALIDATION-REQ-HISTORY-001.md` on Ubuntu/GNOME/Wayland.
 - [ ] TASK-332 close traceability, validation evidence, changelog/version metadata and v1.3.0 release.

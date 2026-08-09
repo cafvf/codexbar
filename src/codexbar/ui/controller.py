@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from enum import StrEnum
 from typing import Final, Protocol
 
+from codexbar.application.alerts import AlertService
 from codexbar.application.refresh import RefreshCoordinator
 from codexbar.domain.errors import CodexBarError
 from codexbar.domain.models import DEFAULT_USAGE_POLICY, UsagePolicy, UsageSnapshot
@@ -57,6 +58,8 @@ class TrayController:
         coordinator: RefreshCoordinator,
         executor: Executor | None = None,
         usage_policy: UsagePolicy = DEFAULT_USAGE_POLICY,
+        alert_service: AlertService | None = None,
+        notifications_enabled: bool = True,
     ) -> None:
         self._coordinator = coordinator
         self._executor = executor or ThreadPoolExecutor(
@@ -64,6 +67,8 @@ class TrayController:
         )
         self._owns_executor = executor is None
         self._usage_policy = usage_policy
+        self._alert_service = alert_service
+        self._notifications_enabled = notifications_enabled
         self._future: Future[UsageSnapshot] | None = None
         self._state = TrayViewState(phase=TrayPhase.LOADING)
 
@@ -77,6 +82,9 @@ class TrayController:
 
     def apply_usage_policy(self, policy: UsagePolicy) -> None:
         self._usage_policy = policy
+
+    def apply_notifications_enabled(self, enabled: bool) -> None:
+        self._notifications_enabled = enabled
 
     def start_refresh(self) -> bool:
         if self.busy:
@@ -104,6 +112,13 @@ class TrayController:
                 message=str(exc),
             )
             return self._state
+
+        if self._alert_service is not None:
+            self._alert_service.process(
+                snapshot,
+                self._usage_policy,
+                notifications_enabled=self._notifications_enabled,
+            )
 
         usage = UsageViewModel.from_snapshot(snapshot, self._usage_policy)
         phase = TrayPhase.STALE if usage.stale else TrayPhase.FRESH

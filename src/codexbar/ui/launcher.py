@@ -2,12 +2,15 @@ from __future__ import annotations
 
 from collections.abc import Callable
 
-from codexbar.application.ports import UsageProvider
+from codexbar.application.ports import NotificationPort, UsageProvider
 from codexbar.application.settings import GetSettings, SettingsRepository
 from codexbar.domain.settings import AppSettings
 from codexbar.ui.errors import GuiDependencyError
 
-QtTrayRunner = Callable[[UsageProvider, AppSettings, SettingsRepository], int]
+QtTrayRunner = Callable[
+    [UsageProvider, AppSettings, SettingsRepository, NotificationPort],
+    int,
+]
 
 
 def _load_qt_tray() -> QtTrayRunner:
@@ -27,6 +30,7 @@ def run_tray(
     provider: UsageProvider,
     *,
     repository: SettingsRepository,
+    notifier: NotificationPort,
 ) -> int:
     settings = GetSettings(repository).execute().settings
-    return _load_qt_tray()(provider, settings, repository)
+    return _load_qt_tray()(provider, settings, repository, notifier)

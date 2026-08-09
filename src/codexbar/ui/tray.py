@@ -19,7 +19,8 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from codexbar.application.ports import UsageProvider
+from codexbar.application.alerts import AlertService
+from codexbar.application.ports import NotificationPort, UsageProvider
 from codexbar.application.refresh import RefreshCoordinator
 from codexbar.application.settings import SettingsRepository
 from codexbar.application.use_cases import GetCurrentUsage
@@ -165,12 +166,15 @@ class TrayShell:
         provider: UsageProvider,
         settings: AppSettings,
         repository: SettingsRepository,
+        notifier: NotificationPort,
     ) -> None:
         self._app = app
         self._settings = settings
         self._controller = TrayController(
             RefreshCoordinator(GetCurrentUsage(provider)),
             usage_policy=settings.usage_policy(),
+            alert_service=AlertService(notifier),
+            notifications_enabled=settings.notifications_enabled,
         )
         self._settings_actions = SettingsActions(repository, self.apply_settings)
         self._settings_dialog: SettingsDialog | None = None
@@ -230,6 +234,7 @@ class TrayShell:
     def apply_settings(self, settings: AppSettings) -> None:
         self._settings = settings
         self._controller.apply_usage_policy(settings.usage_policy())
+        self._controller.apply_notifications_enabled(settings.notifications_enabled)
         apply_refresh_interval(self._refresh_timer, settings)
 
     def show_settings(self) -> None:
@@ -337,10 +342,11 @@ def run_tray(
     provider: UsageProvider,
     settings: AppSettings,
     repository: SettingsRepository,
+    notifier: NotificationPort,
 ) -> int:
     instance = QApplication.instance()
     app = instance if isinstance(instance, QApplication) else QApplication(sys.argv)
     app.setQuitOnLastWindowClosed(False)
-    shell = TrayShell(app, provider, settings, repository)
+    shell = TrayShell(app, provider, settings, repository, notifier)
     shell.start()
     return app.exec()

@@ -1,6 +1,6 @@
 # v1.2 Tasks
 
-Status: alert core implementation in progress
+Status: runtime alert integration in progress
 
 ## REQ-ALERT-001
 
@@ -16,9 +16,9 @@ Status: alert core implementation in progress
   existing `UsagePolicy`.
 - [x] TASK-206 integrate `notifications_enabled` so disabled delivery still advances transition state and
   re-enable does not replay suppressed transitions.
-- [ ] TASK-207 implement the QtDBus Linux desktop notification adapter without adding UI/platform
+- [x] TASK-207 implement the QtDBus Linux desktop notification adapter without adding UI/platform
   dependencies to domain/application alert logic.
-- [ ] TASK-208 wire alert evaluation/delivery into successful current refresh completion without changing
+- [x] TASK-208 wire alert evaluation/delivery into successful current refresh completion without changing
   stale/error or no-overlap semantics.
 - [ ] TASK-209 add architecture/regression tests proving provider-payload isolation, settings-schema
   stability, classifier reuse, and notification-failure containment.

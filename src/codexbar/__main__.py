@@ -204,9 +204,14 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.gui:
         try:
+            from codexbar.infrastructure.notifications import QtDbusNotificationAdapter
             from codexbar.ui.launcher import run_tray
 
-            return run_tray(provider, repository=JsonSettingsRepository())
+            return run_tray(
+                provider,
+                repository=JsonSettingsRepository(),
+                notifier=QtDbusNotificationAdapter(),
+            )
         except CodexBarError as exc:
             print(f"CodexBar: {exc}", file=sys.stderr)
             return 2

@@ -1,17 +1,15 @@
-# v1.3 TASK-312 — canonical XDG history path
+# v1.3 runtime test-only fix
 
-Tests and implementation are delivered together.
+No production behavior changes.
 
-Adds:
-- XDG_DATA_HOME-based history database path resolution;
-- fallback to `$HOME/.local/share`;
-- Snap-scoped XDG_DATA_HOME rejection;
-- no filesystem creation during path resolution;
-- explicit tracking of the remaining AC-HISTORY-037 traceability gap.
+Fixes the acceptance test double so it implements the actual `UsageProvider`
+contract (`get_usage()`), and applies Ruff's import ordering.
 
-No runtime wiring or CLI behavior is introduced yet.
+The previous failures all originated before HistoryService was reached, at:
 
-Run:
+`GetCurrentUsage.execute() -> self._provider.get_usage()`.
+
+Run the complete gate again:
 
 ```bash
 uv run pytest -ra

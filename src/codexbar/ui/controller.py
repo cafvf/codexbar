@@ -6,6 +6,7 @@ from enum import StrEnum
 from typing import Final, Protocol
 
 from codexbar.application.alerts import AlertService
+from codexbar.application.history_runtime import HistoryService
 from codexbar.application.refresh import RefreshCoordinator
 from codexbar.domain.errors import CodexBarError
 from codexbar.domain.models import DEFAULT_USAGE_POLICY, UsagePolicy, UsageSnapshot
@@ -60,6 +61,7 @@ class TrayController:
         usage_policy: UsagePolicy = DEFAULT_USAGE_POLICY,
         alert_service: AlertService | None = None,
         notifications_enabled: bool = True,
+        history_service: HistoryService | None = None,
     ) -> None:
         self._coordinator = coordinator
         self._executor = executor or ThreadPoolExecutor(
@@ -69,6 +71,7 @@ class TrayController:
         self._usage_policy = usage_policy
         self._alert_service = alert_service
         self._notifications_enabled = notifications_enabled
+        self._history_service = history_service
         self._future: Future[UsageSnapshot] | None = None
         self._state = TrayViewState(phase=TrayPhase.LOADING)
 
@@ -112,6 +115,9 @@ class TrayController:
                 message=str(exc),
             )
             return self._state
+
+        if self._history_service is not None:
+            self._history_service.process(snapshot)
 
         if self._alert_service is not None:
             self._alert_service.process(

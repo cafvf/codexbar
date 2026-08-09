@@ -1,16 +1,18 @@
-# mypy fix for TASK-306/307 increment
+# v1.3 TASK-308/309 — retention and schema hardening
 
-No behavioral change.
+Tests and implementation are delivered together.
 
-Fixes the missing return type annotation on the still-unimplemented
-`SqliteHistoryRepository.inspect()` stub:
+This increment:
+- implements `< cutoff` retention with exact-boundary preservation;
+- relies on ON DELETE CASCADE and tests orphan prevention;
+- validates existing schema-v1 databases instead of silently completing them;
+- fails closed on unknown schema versions and corrupt/non-SQLite files;
+- normalizes read/write/prune database failures;
+- proves history pruning does not mutate settings data.
 
-```python
-def inspect(self) -> HistoryInspection:
-    raise NotImplementedError("TASK-319")
-```
-
-Also imports `HistoryInspection`.
+Important behavior change:
+an existing database is never auto-repaired by CREATE TABLE IF NOT EXISTS.
+Only an absent database is initialized.
 
 Run:
 

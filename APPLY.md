@@ -1,28 +1,19 @@
-# v1.2 alert core — tests + implementation
+# notify-send housekeeping fix
 
-This package implements TASK-201 and the framework-independent core for TASK-203..206.
+No production behavior changes.
 
-It deliberately does NOT yet wire alerts into TrayController and does NOT yet implement the QtDBus adapter.
-
-Apply over a checkout that already contains the v1.2 specification files.
+Fixes:
+- narrows the alert-specific architecture invariant so it does not conflict with the pre-existing,
+  legitimate subprocess usage in ui/native_indicator.py;
+- still proves that alert core/controller/launcher/tray do not depend on subprocess or the concrete
+  notification adapter;
+- removes unused sys imports from validation scripts.
 
 Run:
 
 ```bash
 uv run pytest -ra
-uv run ruff check src tests
+uv run ruff check src tests scripts
 uv run mypy
-uv run python -m compileall -q src
+uv run python -m compileall -q src scripts
 ```
-
-Expected behavior added:
-- silent initial baseline, including already LOW/EXHAUSTED;
-- AVAILABLE→LOW, AVAILABLE→EXHAUSTED, LOW→EXHAUSTED and EXHAUSTED→LOW events;
-- same-state deduplication;
-- recovery re-arm;
-- window absence does not re-arm;
-- stale snapshots do not advance state;
-- disabled notifications advance state but do not deliver/replay;
-- normalized delivery failures are contained.
-
-ADR-006 selects PySide6.QtDBus + org.freedesktop.Notifications for TASK-207.

@@ -26,12 +26,7 @@ _UNSAFE_NATIVE_ENV_KEYS: Final = (
 
 
 def sanitized_native_environment(source: dict[str, str] | None = None) -> dict[str, str]:
-    """Return an environment safe for launching distro-native GTK/Ayatana helpers.
-
-    Graphical-session and D-Bus variables are preserved, while loader/Python/GTK overrides
-    and Snap-specific variables are removed so /usr/bin/python3 cannot accidentally load
-    libraries from an unrelated bundled runtime.
-    """
+    """Return an environment safe for launching distro-native GTK/Ayatana helpers."""
 
     env = dict(os.environ if source is None else source)
     for key in _UNSAFE_NATIVE_ENV_KEYS:
@@ -54,8 +49,6 @@ class NativeIndicator(Protocol):
     def is_healthy(self) -> bool: ...
 
     def close(self) -> None: ...
-
-
 
 
 @dataclass(frozen=True, slots=True)
@@ -120,11 +113,7 @@ def ayatana_availability(system_python: str = SYSTEM_PYTHON) -> NativeIndicatorA
 
 
 class AyatanaHelperIndicator:
-    """Native indicator hosted in a distro-Python subprocess.
-
-    The helper has no access to Codex credentials or domain objects. The parent sends only
-    presentation strings; the helper sends only UI intent events back to the parent.
-    """
+    """Native indicator hosted in a distro-Python subprocess."""
 
     def __init__(
         self,
@@ -133,6 +122,7 @@ class AyatanaHelperIndicator:
         on_refresh: Callable[[], None],
         on_details: Callable[[], None],
         on_quit: Callable[[], None],
+        on_settings: Callable[[], None] | None = None,
         system_python: str = SYSTEM_PYTHON,
     ) -> None:
         self._callbacks = {
@@ -140,11 +130,13 @@ class AyatanaHelperIndicator:
             "details": on_details,
             "quit": on_quit,
         }
+        if on_settings is not None:
+            self._callbacks["settings"] = on_settings
+
         self._tmpdir = TemporaryDirectory(prefix="codexbar-indicator-")
         icon_path = Path(self._tmpdir.name) / "codexbar.png"
         icon_path.write_bytes(icon_png)
 
-        env = sanitized_native_environment()
         try:
             self._process = subprocess.Popen(
                 [system_python, str(_helper_path()), "--icon", str(icon_path)],
@@ -153,7 +145,7 @@ class AyatanaHelperIndicator:
                 stderr=subprocess.PIPE,
                 text=True,
                 bufsize=1,
-                env=env,
+                env=sanitized_native_environment(),
             )
         except OSError:
             self._tmpdir.cleanup()
@@ -167,7 +159,6 @@ class AyatanaHelperIndicator:
             raise
 
     def show(self) -> None:
-        # Registration is completed during the startup handshake.
         return None
 
     def set_glance(self, text: str, *, stale: bool = False) -> None:
@@ -265,17 +256,12 @@ class AyatanaHelperIndicator:
         stdin.flush()
 
 
-
 def run_indicator_diagnostics(
     system_python: str = SYSTEM_PYTHON,
     *,
     timeout_seconds: float = 8.0,
 ) -> IndicatorDiagnosticReport:
-    """Run the native helper in diagnostic mode and return structured step results.
-
-    This does not claim that the desktop physically renders the indicator. It verifies the
-    system-Python/GI/Ayatana/GTK path through indicator activation and one GLib loop turn.
-    """
+    """Run the native helper in diagnostic mode and return structured step results."""
 
     helper = _helper_path()
     preflight: list[IndicatorDiagnosticStep] = []
@@ -342,6 +328,7 @@ def create_ayatana_indicator(
     on_refresh: Callable[[], None],
     on_details: Callable[[], None],
     on_quit: Callable[[], None],
+    on_settings: Callable[[], None] | None = None,
 ) -> NativeIndicator | None:
     if not ayatana_availability().available:
         return None
@@ -351,6 +338,7 @@ def create_ayatana_indicator(
             on_refresh=on_refresh,
             on_details=on_details,
             on_quit=on_quit,
+            on_settings=on_settings,
         )
     except (OSError, RuntimeError):
         return None

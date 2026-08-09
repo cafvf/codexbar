@@ -18,7 +18,13 @@ from contextlib import suppress
 from pathlib import Path
 from typing import Any
 
-# Minimal valid PNG used only by --diagnose so the diagnostic does not depend on PySide6.
+MENU_ACTIONS = (
+    ("Refresh", "refresh"),
+    ("Open details", "details"),
+    ("Settings", "settings"),
+    ("Quit", "quit"),
+)
+
 _DIAGNOSTIC_PNG = base64.b64decode(
     "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII="
 )
@@ -193,10 +199,15 @@ def main() -> int:
     details_item.connect("activate", lambda *_: _emit("details"))
     menu.append(details_item)
 
+    settings_item = Gtk.MenuItem(label="Settings")
+    settings_item.connect("activate", lambda *_: _emit("settings"))
+    menu.append(settings_item)
+
     menu.append(Gtk.SeparatorMenuItem())
     quit_item = Gtk.MenuItem(label="Quit")
     quit_item.connect("activate", lambda *_: _emit("quit"))
     menu.append(quit_item)
+
     menu.show_all()
     indicator.set_menu(menu)
     indicator.set_status(AppIndicator3.IndicatorStatus.ACTIVE)

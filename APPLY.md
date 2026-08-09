@@ -1,21 +1,16 @@
-# TASK-112 — complete implementation
+# TASK-115 native Settings menu correction — v2
 
-This archive implements the four already-installed RED tests for:
+This package is self-contained. No patch script is required.
 
-- `codexbar settings show`
-- `codexbar settings reset`
+It fixes:
+1. native Ayatana menu missing Settings;
+2. parent helper contract missing on_settings callback;
+3. the existing AC-UI-023 literal protocol test by preserving explicit
+   `_emit("refresh")`, `_emit("details")`, and `_emit("quit")` calls;
+4. import ordering in the added test;
+5. TrayShell wiring to `on_settings=self.show_settings`.
 
-Behavior:
-- `show` reports defaults vs persisted origin;
-- `show` prints LOW threshold, refresh interval, notification flag;
-- corrupt settings fall back to defaults while exposing the typed diagnostic;
-- `reset` uses the existing application `ResetSettings` use case;
-- expected settings failures return exit code 2;
-- desktop and usage CLI behavior are preserved.
-
-The task file is advanced to mark TASK-112 complete.
-
-Run:
+Extract over the repository root, then run:
 
 ```bash
 uv run pytest -ra
@@ -24,7 +19,10 @@ uv run mypy
 uv run python -m compileall -q src
 ```
 
-Expected pytest count with the current local suite: 123 passed.
+If green:
 
-From TASK-113 onward, each delivery will include tests and production implementation
-together, per the agreed workflow.
+```bash
+uv run python -m codexbar --mock --gui
+```
+
+The active Ayatana menu should include Settings.

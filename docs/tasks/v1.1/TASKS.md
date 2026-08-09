@@ -1,6 +1,6 @@
 # v1.1 Tasks
 
-Status: GUI settings implementation phase
+Status: target GUI validation phase
 
 ## REQ-SETTINGS-001
 
@@ -17,7 +17,7 @@ Status: GUI settings implementation phase
 - [x] TASK-110 integrate configured LOW threshold with `UsagePolicy`.
 - [x] TASK-111 make refresh cadence runtime-configurable without overlapping refresh operations.
 - [x] TASK-112 implement `settings show` and `settings reset` CLI surfaces.
-- [ ] TASK-113 implement Qt settings surface with Save/Cancel/Reset and validation feedback.
-- [ ] TASK-114 run repository-wide pytest/ruff/mypy/compileall gates.
+- [x] TASK-113 implement Qt settings surface with Save/Cancel/Reset and validation feedback.
+- [x] TASK-114 run repository-wide pytest/ruff/mypy/compileall gates.
 - [ ] TASK-115 validate GUI settings lifecycle and restart persistence on target Linux workstation.
 - [ ] TASK-116 close traceability and release documentation for REQ-SETTINGS-001.

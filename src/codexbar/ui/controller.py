@@ -75,6 +75,9 @@ class TrayController:
     def busy(self) -> bool:
         return self._future is not None and not self._future.done()
 
+    def apply_usage_policy(self, policy: UsagePolicy) -> None:
+        self._usage_policy = policy
+
     def start_refresh(self) -> bool:
         if self.busy:
             return False

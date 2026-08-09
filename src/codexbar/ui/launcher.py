@@ -7,7 +7,7 @@ from codexbar.application.settings import GetSettings, SettingsRepository
 from codexbar.domain.settings import AppSettings
 from codexbar.ui.errors import GuiDependencyError
 
-QtTrayRunner = Callable[[UsageProvider, AppSettings], int]
+QtTrayRunner = Callable[[UsageProvider, AppSettings, SettingsRepository], int]
 
 
 def _load_qt_tray() -> QtTrayRunner:
@@ -29,4 +29,4 @@ def run_tray(
     repository: SettingsRepository,
 ) -> int:
     settings = GetSettings(repository).execute().settings
-    return _load_qt_tray()(provider, settings)
+    return _load_qt_tray()(provider, settings, repository)

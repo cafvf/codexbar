@@ -17,16 +17,19 @@ class FakeRepository:
 def test_gui_startup_loads_effective_app_settings_before_entering_qt(monkeypatch) -> None:
     captured: dict[str, object] = {}
 
-    def fake_qt_tray(provider, settings):
+    def fake_qt_tray(provider, settings, repository):
         captured["provider"] = provider
         captured["settings"] = settings
+        captured["repository"] = repository
         return 0
 
     monkeypatch.setattr(launcher, "_load_qt_tray", lambda: fake_qt_tray)
 
     provider = object()
-    result = launcher.run_tray(provider, repository=FakeRepository())
+    repository = FakeRepository()
+    result = launcher.run_tray(provider, repository=repository)
 
     assert result == 0
     assert captured["provider"] is provider
     assert captured["settings"] == AppSettings.defaults()
+    assert captured["repository"] is repository

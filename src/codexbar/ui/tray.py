@@ -21,6 +21,7 @@ from PySide6.QtWidgets import (
 
 from codexbar.application.ports import UsageProvider
 from codexbar.application.refresh import RefreshCoordinator
+from codexbar.application.settings import SettingsRepository
 from codexbar.application.use_cases import GetCurrentUsage
 from codexbar.domain.settings import AppSettings
 from codexbar.ui.controller import (
@@ -32,6 +33,7 @@ from codexbar.ui.controller import (
 )
 from codexbar.ui.errors import SystemTrayUnavailableError
 from codexbar.ui.native_indicator import NativeIndicator, create_ayatana_indicator
+from codexbar.ui.settings import SettingsActions, SettingsDialog
 
 
 class UsagePanel(QDialog):
@@ -157,13 +159,22 @@ def codexbar_icon_png(size: int = 64) -> bytes:
 
 
 class TrayShell:
-    def __init__(self, app: QApplication, provider: UsageProvider, settings: AppSettings) -> None:
+    def __init__(
+        self,
+        app: QApplication,
+        provider: UsageProvider,
+        settings: AppSettings,
+        repository: SettingsRepository,
+    ) -> None:
         self._app = app
         self._settings = settings
         self._controller = TrayController(
             RefreshCoordinator(GetCurrentUsage(provider)),
             usage_policy=settings.usage_policy(),
         )
+        self._settings_actions = SettingsActions(repository, self.apply_settings)
+        self._settings_dialog: SettingsDialog | None = None
+
         self._panel = UsagePanel()
         self._panel.refresh_button.clicked.connect(self.refresh)
         self._panel.quit_button.clicked.connect(app.quit)
@@ -173,6 +184,7 @@ class TrayShell:
             on_refresh=self.refresh,
             on_details=self.show_panel,
             on_quit=app.quit,
+            on_settings=self.show_settings,
         )
 
         self._tray: QSystemTrayIcon | None = None
@@ -186,12 +198,15 @@ class TrayShell:
         refresh_action.triggered.connect(self.refresh)
         details_action = QAction("Open details", self._menu)
         details_action.triggered.connect(self.show_panel)
+        settings_action = QAction("Settings", self._menu)
+        settings_action.triggered.connect(self.show_settings)
         quit_action = QAction("Quit", self._menu)
         quit_action.triggered.connect(app.quit)
         self._menu.addAction(self._summary_action)
         self._menu.addSeparator()
         self._menu.addAction(refresh_action)
         self._menu.addAction(details_action)
+        self._menu.addAction(settings_action)
         self._menu.addSeparator()
         self._menu.addAction(quit_action)
         if self._tray is not None:
@@ -214,7 +229,19 @@ class TrayShell:
 
     def apply_settings(self, settings: AppSettings) -> None:
         self._settings = settings
+        self._controller.apply_usage_policy(settings.usage_policy())
         apply_refresh_interval(self._refresh_timer, settings)
+
+    def show_settings(self) -> None:
+        dialog = SettingsDialog(self._settings, self._settings_actions, self._panel)
+        self._settings_dialog = dialog
+        dialog.finished.connect(self._settings_dialog_finished)
+        dialog.show()
+        dialog.raise_()
+        dialog.activateWindow()
+
+    def _settings_dialog_finished(self, _result: int) -> None:
+        self._settings_dialog = None
 
     def start(self) -> None:
         if self._native_indicator is not None:
@@ -306,10 +333,14 @@ class TrayShell:
         self._panel.activateWindow()
 
 
-def run_tray(provider: UsageProvider, settings: AppSettings) -> int:
+def run_tray(
+    provider: UsageProvider,
+    settings: AppSettings,
+    repository: SettingsRepository,
+) -> int:
     instance = QApplication.instance()
     app = instance if isinstance(instance, QApplication) else QApplication(sys.argv)
     app.setQuitOnLastWindowClosed(False)
-    shell = TrayShell(app, provider, settings)
+    shell = TrayShell(app, provider, settings, repository)
     shell.start()
     return app.exec()

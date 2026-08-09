@@ -1,5 +1,44 @@
 # Changelog
 
+## 1.2.0 — 2026-08-09
+
+Validated alerting release of CodexBar.
+
+### Added
+- transition-based desktop notifications for LOW and EXHAUSTED Codex usage states;
+- per-window runtime transition tracking with silent startup/restart baselines;
+- deduplication of repeated unchanged constrained states;
+- re-arm after recovery to AVAILABLE;
+- live respect for the persisted `notifications_enabled` setting without replay on re-enable;
+- `NotificationPort` boundary and normalized `NotificationDeliveryError`;
+- Linux desktop notification delivery through distro-native `notify-send` / `libnotify-bin`;
+- controlled alert-validation and notification-diagnostic scripts.
+
+### Changed
+- the v1.1 `notifications_enabled` preference now controls real desktop notification delivery;
+- alert classification reuses the configured `UsagePolicy` and existing LOW threshold;
+- notification transport decision was revised from direct PySide6 QtDBus to `notify-send` after physical
+  target validation exposed D-Bus marshalling incompatibilities in the Python binding;
+- development/release checks now include the `scripts` directory where applicable;
+- release metadata advances from 1.1.0 to 1.2.0.
+
+### Compatibility and safety
+- settings schema remains version 1;
+- no persisted alert/deduplication state is introduced;
+- stale snapshots and provider failures do not fabricate alert transitions;
+- notification-delivery failure does not invalidate a successful usage refresh or stop later refreshes;
+- raw provider payloads and credentials do not cross the notification boundary;
+- v1.0/v1.1 provider, tray, settings and desktop contracts remain in force.
+
+### Validation
+- acceptance, unit, architecture and regression suites passed;
+- repository-wide pytest, ruff, strict mypy and compileall gates passed during implementation;
+- `notify-send` diagnostics returned success and a positive notification id on Ubuntu/GNOME/Wayland;
+- LOW and EXHAUSTED notifications were visibly presented and distinguishable on the target workstation.
+
+See `docs/specs/v1.2/RELEASE.md`, `docs/TRACEABILITY-REQ-ALERT-001.md`,
+`docs/VALIDATION-REQ-ALERT-001.md` and `docs/adr/ADR-006-linux-notifications.md`.
+
 ## 1.1.0 — 2026-08-08
 
 Validated settings release of CodexBar.
@@ -53,11 +92,3 @@ First validated release of CodexBar.
 - managed uninstall and checkout-independent installed execution;
 - protection against Snap-scoped XDG installation paths;
 - repository-wide pytest, ruff, strict mypy and compileall release gates.
-
-### Supported baseline
-- Linux;
-- Python `>=3.12,<3.15`;
-- a locally installed and authenticated Codex;
-- `uv` for the supported installation workflow.
-
-See `docs/specs/v1.0/RELEASE.md` and `docs/VALIDATION.md` for the release contract and validation evidence.

@@ -1,6 +1,6 @@
 # v1.2 Tasks
 
-Status: runtime alert integration in progress
+Status: architecture/regression hardening complete; target validation next
 
 ## REQ-ALERT-001
 
@@ -20,7 +20,7 @@ Status: runtime alert integration in progress
   dependencies to domain/application alert logic.
 - [x] TASK-208 wire alert evaluation/delivery into successful current refresh completion without changing
   stale/error or no-overlap semantics.
-- [ ] TASK-209 add architecture/regression tests proving provider-payload isolation, settings-schema
+- [x] TASK-209 add architecture/regression tests proving provider-payload isolation, settings-schema
   stability, classifier reuse, and notification-failure containment.
 - [ ] TASK-210 run repository-wide pytest/ruff/mypy/compileall gates and preserve all v1.0/v1.1 tests.
 - [ ] TASK-211 validate LOW, EXHAUSTED, deduplication, re-arm, disable/re-enable, restart baseline, and

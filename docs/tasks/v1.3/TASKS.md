@@ -1,6 +1,6 @@
 # v1.3 Tasks
 
-Status: retention/schema hardening in progress
+Status: history store operations in progress
 Requirement: REQ-HISTORY-001
 ADR: ADR-007
 
@@ -16,13 +16,11 @@ ADR: ADR-007
 ## Acceptance tests first
 - [x] TASK-306 capture/restart acceptance coverage.
 - [x] TASK-307 query acceptance coverage.
-- [x] TASK-308 add acceptance tests for AC-HISTORY-018..023: 30-day retention boundary, idempotency,
-  cascade integrity and settings-schema independence.
-- [x] TASK-309 add acceptance tests for AC-HISTORY-024..028: normalized failure behavior, unknown schema
-  and corruption fail-closed semantics.
-- [ ] TASK-310 add acceptance tests for AC-HISTORY-029..032: absent/empty/non-empty/unreadable inspection.
-- [ ] TASK-311 add acceptance tests for AC-HISTORY-033..038: explicit clear, schema preservation,
-  empty idempotency, settings/runtime isolation and corrupt-store refusal.
+- [x] TASK-308 retention acceptance coverage.
+- [x] TASK-309 schema/corruption failure acceptance coverage.
+- [x] TASK-310 add acceptance tests for AC-HISTORY-029..032: absent/empty/non-empty/unreadable inspection.
+- [x] TASK-311 add acceptance tests for AC-HISTORY-033..038: explicit clear, schema preservation,
+  empty idempotency, settings isolation and corrupt-store refusal.
 
 ## SQLite infrastructure
 - [ ] TASK-312 implement canonical XDG history path resolution with Snap-scoped fallback protection.
@@ -32,8 +30,8 @@ ADR: ADR-007
 - [x] TASK-316 implement atomic snapshot + window persistence.
 - [x] TASK-317 implement indexed interval and stable-window queries.
 - [x] TASK-318 implement fixed 30-day pruning with cascade and exact cutoff semantics.
-- [ ] TASK-319 implement inspection summary.
-- [ ] TASK-320 implement transactional history clear preserving schema.
+- [x] TASK-319 implement inspection summary.
+- [x] TASK-320 implement transactional history clear preserving schema.
 - [x] TASK-321 normalize SQLite/schema/corruption failures without destructive recovery.
 
 ## Runtime integration

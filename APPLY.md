@@ -1,18 +1,16 @@
-# v1.3 TASK-308/309 — retention and schema hardening
+# v1.3 TASK-310/311 + TASK-319/320
 
 Tests and implementation are delivered together.
 
-This increment:
-- implements `< cutoff` retention with exact-boundary preservation;
-- relies on ON DELETE CASCADE and tests orphan prevention;
-- validates existing schema-v1 databases instead of silently completing them;
-- fails closed on unknown schema versions and corrupt/non-SQLite files;
-- normalizes read/write/prune database failures;
-- proves history pruning does not mutate settings data.
+This increment adds:
+- non-destructive path inspection for ABSENT / UNSUPPORTED / UNREADABLE;
+- repository inspection for READY_EMPTY / READY_NON_EMPTY;
+- schema version, count, oldest and newest observation metadata;
+- transactional history clear preserving schema/meta;
+- clear idempotency;
+- explicit refusal to treat corrupt/unsupported storage as clear/repair.
 
-Important behavior change:
-an existing database is never auto-repaired by CREATE TABLE IF NOT EXISTS.
-Only an absent database is initialized.
+No XDG path resolution, CLI commands, or refresh/runtime wiring is introduced yet.
 
 Run:
 

@@ -17,6 +17,7 @@ from codexbar.application.history import (
     HistoryReadError,
     HistoryRepository,
     HistorySchemaError,
+    HistoryState,
     HistoryWriteError,
 )
 from codexbar.domain.models import Fraction, UsageSource, UsageWindowId
@@ -412,8 +413,92 @@ class SqliteHistoryRepository(HistoryRepository):
                 ) from exc
             raise HistoryWriteError(f"cannot prune history: {exc}") from exc
 
+    @classmethod
+    def inspect_path(cls, path: Path) -> HistoryInspection:
+        """Inspect a history path without creating, repairing, or mutating it."""
+
+        if not path.exists():
+            return HistoryInspection(
+                path=str(path),
+                state=HistoryState.ABSENT,
+            )
+
+        try:
+            repository = cls(path)
+        except HistorySchemaError as exc:
+            return HistoryInspection(
+                path=str(path),
+                state=HistoryState.UNSUPPORTED,
+                diagnostic=str(exc),
+            )
+        except (HistoryCorruptionError, HistoryReadError, HistoryWriteError) as exc:
+            return HistoryInspection(
+                path=str(path),
+                state=HistoryState.UNREADABLE,
+                diagnostic=str(exc),
+            )
+
+        return repository.inspect()
+
     def inspect(self) -> HistoryInspection:
-        raise NotImplementedError("TASK-319")
+        try:
+            with self._connect() as connection:
+                version_row = connection.execute(
+                    """
+                    SELECT value
+                    FROM history_meta
+                    WHERE key = 'schema_version'
+                    """
+                ).fetchone()
+                if version_row is None:
+                    raise HistorySchemaError("history schema version is missing")
+
+                aggregate = connection.execute(
+                    """
+                    SELECT
+                        COUNT(*),
+                        MIN(observed_at_utc),
+                        MAX(observed_at_utc)
+                    FROM snapshots
+                    """
+                ).fetchone()
+                if aggregate is None:
+                    raise sqlite3.DatabaseError("history inspection returned no aggregate row")
+
+                count, oldest, newest = aggregate
+                state = (
+                    HistoryState.READY_EMPTY
+                    if count == 0
+                    else HistoryState.READY_NON_EMPTY
+                )
+                return HistoryInspection(
+                    path=str(self._path),
+                    state=state,
+                    schema_version=int(version_row[0]),
+                    snapshot_count=int(count),
+                    oldest_observed_at=(
+                        _parse_timestamp(oldest) if oldest is not None else None
+                    ),
+                    newest_observed_at=(
+                        _parse_timestamp(newest) if newest is not None else None
+                    ),
+                )
+        except HistorySchemaError:
+            raise
+        except (ValueError, sqlite3.DatabaseError) as exc:
+            if isinstance(exc, sqlite3.DatabaseError) and _is_corruption_error(exc):
+                raise HistoryCorruptionError(
+                    f"history database is corrupt during inspection: {exc}"
+                ) from exc
+            raise HistoryReadError(f"cannot inspect history: {exc}") from exc
 
     def clear(self) -> None:
-        raise NotImplementedError("TASK-320")
+        try:
+            with self._connect() as connection:
+                connection.execute("DELETE FROM snapshots")
+        except sqlite3.DatabaseError as exc:
+            if _is_corruption_error(exc):
+                raise HistoryCorruptionError(
+                    f"history database is corrupt during clear: {exc}"
+                ) from exc
+            raise HistoryWriteError(f"cannot clear history: {exc}") from exc

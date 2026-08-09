@@ -1,76 +1,70 @@
 # ADR-006 — Linux desktop notification transport
 
-Status: accepted
+Status: accepted, revised after target validation
 Date: 2026-08-08
+Revised: 2026-08-09
 Release: v1.2
 Requirement: REQ-ALERT-001
 
 ## Context
 
-v1.2 introduces passive desktop notifications for normalized usage-state transitions. The transport choice
-creates a lasting desktop compatibility boundary and therefore requires an ADR under C-11.
+v1.2 needs passive desktop notifications while preserving the existing Python/uv and architecture
+boundaries.
 
-CodexBar already depends on PySide6 for the GUI, runs as a user-local `uv tool`, supports
-Ubuntu/GNOME/Wayland as the validated target, and intentionally isolates distro-native GI/Ayatana bindings
-in a system-Python helper.
+The first decision selected direct `org.freedesktop.Notifications` calls through `PySide6.QtDBus`.
+Automated tests validated the abstract adapter contract, but physical Ubuntu/GNOME/Wayland validation
+exposed a binding-level marshalling defect:
 
-Candidate transports considered:
+- the freedesktop `Notify` method requires signature `(susssasa{sv}i)`;
+- PySide6 serialized the Python arguments as `(sisssava{sv}i)`;
+- `replaces_id=0` became D-Bus INT32 instead of UINT32;
+- an empty Python actions list became `array<variant>` instead of `array<string>`;
+- GNOME correctly rejected the call with `org.freedesktop.DBus.Error.InvalidArgs`.
 
-1. `QSystemTrayIcon.showMessage()`;
-2. spawning `notify-send`;
-3. GI/libnotify bindings;
-4. direct `org.freedesktop.Notifications` D-Bus calls through `PySide6.QtDBus`.
+Continuing with QtDBus would require binding-specific manual type construction for values that are trivial
+for a native notification client.
 
-## Decision
+## Revised decision
 
-Use the freedesktop Desktop Notifications D-Bus protocol through `PySide6.QtDBus` for the Linux notification
-adapter.
+Use the distro-native `notify-send` client from `libnotify-bin` as the Linux implementation of
+`NotificationPort`.
 
-The adapter will call the session-bus service `org.freedesktop.Notifications`, object path
-`/org/freedesktop/Notifications`, interface `org.freedesktop.Notifications`, method `Notify`.
+The adapter invokes `notify-send` with an argument vector (never a shell string), captures the exit status,
+and normalizes execution/timeout/non-zero failures to `NotificationDeliveryError`.
 
-The application layer exposes a narrow `NotificationPort`; no Qt/D-Bus type crosses that port.
+LOW uses normal urgency. EXHAUSTED uses critical urgency. Both retain distinct titles and the normalized
+window label/body.
 
 ## Rationale
 
-- `org.freedesktop.Notifications` is the desktop notification protocol rather than a tray-specific API.
-- PySide6 already supplies Qt D-Bus integration in the GUI runtime, so no new Python package or distro GI
-  binding is required.
-- The choice is independent of whether CodexBar is currently using the native Ayatana indicator or the Qt
-  tray fallback.
-- Direct protocol use avoids relying on an external `notify-send` executable and subprocess lifecycle.
-- The adapter can normalize D-Bus/service failures to `NotificationDeliveryError`.
-- The core transition/deduplication logic remains fully framework-independent.
+- `notify-send` is purpose-built to send desktop notifications through the user's notification daemon.
+- libnotify owns the D-Bus marshalling details, including UINT32 and typed empty arrays.
+- no GI/PyGObject dependency is introduced into the uv-managed environment.
+- `subprocess` is confined to the infrastructure adapter; domain/application alert logic remains unchanged.
+- argument-vector execution avoids shell parsing/injection.
+- the external executable boundary is easy to diagnose (`command -v notify-send`, direct control call) and
+  failure-isolated through the existing `NotificationPort`.
 
 ## Rejected alternatives
 
-### QSystemTrayIcon.showMessage
+### Direct PySide6.QtDBus
 
-Rejected as the primary transport because alerts are not conceptually tray messages and CodexBar may use the
-Ayatana backend instead of a visible Qt tray icon. Qt also documents that tray-message presentation depends
-on system support/configuration.
+Rejected after target validation. It works for discovery calls such as `GetServerInformation`, but the
+Python binding did not preserve the exact freedesktop `Notify` types for UINT32 and an empty string array.
+The resulting call was rejected by GNOME with `InvalidArgs`.
 
-### `notify-send` subprocess
+### GI/libnotify inside the uv environment
 
-Rejected because it adds an executable/runtime dependency and subprocess failure surface for behavior that is
-already available through the existing Qt runtime.
+Rejected because it would reverse the existing distro-binding isolation policy.
 
-### GI/libnotify in the main environment
+### Generic shell command
 
-Rejected because it conflicts with the established isolation strategy: distro-native GI dependencies must not
-contaminate the uv-managed main environment.
+Rejected. The adapter executes a fixed argument vector directly with `subprocess.run`; it does not invoke a
+shell.
 
 ## Consequences
 
-- The Linux adapter depends on PySide6 QtDBus availability and a freedesktop notification service on the
-  user session bus.
-- Transport availability/failure must be treated as non-fatal.
-- Target-system validation must include the actual Ubuntu/GNOME/Wayland notification server.
-- A future non-Linux port may implement `NotificationPort` differently without changing alert transition
-  semantics.
-
-## References
-
-- freedesktop.org Desktop Notifications Specification, version 1.3.
-- Qt for Python `PySide6.QtDBus.QDBusInterface` documentation.
-- Qt `QSystemTrayIcon.showMessage()` documentation (considered and rejected as the primary transport).
+- Linux notification support now has a small host dependency: `notify-send` / `libnotify-bin`.
+- installation documentation must list this dependency for v1.2.
+- missing executable, timeout, and non-zero exit are non-fatal notification failures.
+- a future platform can implement `NotificationPort` differently.

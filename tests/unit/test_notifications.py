@@ -4,26 +4,11 @@ from datetime import UTC, datetime
 from decimal import Decimal
 
 import pytest
-from PySide6.QtDBus import QDBusMessage
 
 from codexbar.application.alerts import AlertEvent
 from codexbar.domain.errors import NotificationDeliveryError
 from codexbar.domain.models import Fraction, UsageWindowId, UsageWindowState
-from codexbar.infrastructure.notifications import QtDbusNotificationAdapter
-
-
-class FakeInterface:
-    def __init__(self, *, valid: bool = True, reply: QDBusMessage | None = None) -> None:
-        self.valid = valid
-        self.reply = reply or QDBusMessage()
-        self.calls: list[tuple[str, tuple[object, ...]]] = []
-
-    def isValid(self) -> bool:
-        return self.valid
-
-    def call(self, method: str, *args: object) -> QDBusMessage:
-        self.calls.append((method, args))
-        return self.reply
+from codexbar.infrastructure.notifications import CommandResult, NotifySendNotificationAdapter
 
 
 def event(state: UsageWindowState, remaining: str) -> AlertEvent:
@@ -37,49 +22,53 @@ def event(state: UsageWindowState, remaining: str) -> AlertEvent:
 
 
 @pytest.mark.parametrize(
-    ("state", "remaining", "expected_summary"),
+    ("state", "remaining", "summary", "urgency"),
     [
-        (UsageWindowState.LOW, "0.15", "CodexBar usage low"),
-        (UsageWindowState.EXHAUSTED, "0", "CodexBar usage exhausted"),
+        (UsageWindowState.LOW, "0.15", "CodexBar usage low", "--urgency=normal"),
+        (
+            UsageWindowState.EXHAUSTED,
+            "0",
+            "CodexBar usage exhausted",
+            "--urgency=critical",
+        ),
     ],
 )
-def test_qtdbus_adapter_sends_distinguishable_normalized_notifications(
+def test_notify_send_adapter_builds_normalized_command(
     state: UsageWindowState,
     remaining: str,
-    expected_summary: str,
+    summary: str,
+    urgency: str,
 ) -> None:
-    interface = FakeInterface()
-    adapter = QtDbusNotificationAdapter(lambda: interface)
+    commands: list[tuple[str, ...]] = []
 
+    def runner(command):
+        commands.append(tuple(command))
+        return CommandResult(returncode=0)
+
+    adapter = NotifySendNotificationAdapter(runner)
     adapter.notify(event(state, remaining))
 
-    assert len(interface.calls) == 1
-    method, args = interface.calls[0]
-    assert method == "Notify"
-    assert args[0] == "CodexBar"
-    assert args[3] == expected_summary
-    assert "Weekly" in str(args[4])
-    assert f"{Fraction(Decimal(remaining)).percent.normalize():f}%" in str(args[4])
+    assert len(commands) == 1
+    command = commands[0]
+    assert command[0] == "notify-send"
+    assert "--app-name=CodexBar" in command
+    assert urgency in command
+    assert summary in command
+    assert any("Weekly" in part for part in command)
+    assert any(f"{Fraction(Decimal(remaining)).percent.normalize():f}%" in part for part in command)
 
 
-def test_qtdbus_adapter_normalizes_unavailable_service() -> None:
-    adapter = QtDbusNotificationAdapter(lambda: FakeInterface(valid=False))
+def test_notify_send_adapter_normalizes_nonzero_exit() -> None:
+    adapter = NotifySendNotificationAdapter(
+        lambda _command: CommandResult(returncode=1, stderr="daemon unavailable")
+    )
 
-    with pytest.raises(NotificationDeliveryError, match="unavailable"):
-        adapter.notify(event(UsageWindowState.LOW, "0.15"))
-
-
-def test_qtdbus_adapter_normalizes_dbus_error_reply() -> None:
-    reply = QDBusMessage.createError("org.example.Failure", "boom")
-    adapter = QtDbusNotificationAdapter(lambda: FakeInterface(reply=reply))
-
-    with pytest.raises(NotificationDeliveryError, match="boom"):
+    with pytest.raises(NotificationDeliveryError, match="daemon unavailable"):
         adapter.notify(event(UsageWindowState.LOW, "0.15"))
 
 
 def test_alert_event_contract_excludes_provider_payload_fields() -> None:
     alert = event(UsageWindowState.LOW, "0.15")
-
     assert not hasattr(alert, "raw_payload")
     assert not hasattr(alert, "account_id")
     assert not hasattr(alert, "credentials")

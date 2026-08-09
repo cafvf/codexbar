@@ -1,70 +1,91 @@
 from __future__ import annotations
 
-from collections.abc import Callable
-from typing import Any, Protocol, cast
-
-from PySide6.QtDBus import QDBusConnection, QDBusInterface, QDBusMessage
+import shutil
+import subprocess
+from collections.abc import Callable, Sequence
+from dataclasses import dataclass
 
 from codexbar.application.alerts import AlertEvent
 from codexbar.domain.errors import NotificationDeliveryError
 from codexbar.domain.models import UsageWindowState
 
-_SERVICE = "org.freedesktop.Notifications"
-_PATH = "/org/freedesktop/Notifications"
-_INTERFACE = "org.freedesktop.Notifications"
+_NOTIFY_SEND = "notify-send"
+_COMMAND_TIMEOUT_SECONDS = 5.0
 
 
-class _DbusInterface(Protocol):
-    def isValid(self) -> bool: ...
+@dataclass(frozen=True, slots=True)
+class CommandResult:
+    returncode: int
+    stdout: str = ""
+    stderr: str = ""
 
 
-InterfaceFactory = Callable[[], _DbusInterface]
+CommandRunner = Callable[[Sequence[str]], CommandResult]
 
 
-def _default_interface() -> _DbusInterface:
-    return cast(
-        _DbusInterface,
-        QDBusInterface(
-            _SERVICE,
-            _PATH,
-            _INTERFACE,
-            QDBusConnection.sessionBus(),
-        ),
+def _default_runner(command: Sequence[str]) -> CommandResult:
+    try:
+        completed = subprocess.run(
+            list(command),
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=_COMMAND_TIMEOUT_SECONDS,
+        )
+    except FileNotFoundError as exc:
+        raise NotificationDeliveryError(
+            "notify-send is unavailable; install the libnotify-bin package"
+        ) from exc
+    except subprocess.TimeoutExpired as exc:
+        raise NotificationDeliveryError("notify-send timed out") from exc
+    except OSError as exc:
+        raise NotificationDeliveryError(f"cannot execute notify-send: {exc}") from exc
+
+    return CommandResult(
+        returncode=completed.returncode,
+        stdout=completed.stdout,
+        stderr=completed.stderr,
     )
 
 
-def _call_notify(interface: _DbusInterface, *args: object) -> QDBusMessage:
-    qt_interface = cast(Any, interface)
-    return cast(QDBusMessage, qt_interface.call("Notify", *args))
+class NotifySendNotificationAdapter:
+    """Deliver normalized alerts through the distro-native libnotify client."""
 
-
-class QtDbusNotificationAdapter:
-    """Deliver normalized alerts through org.freedesktop.Notifications."""
-
-    def __init__(self, interface_factory: InterfaceFactory = _default_interface) -> None:
-        self._interface_factory = interface_factory
+    def __init__(
+        self,
+        runner: CommandRunner = _default_runner,
+        *,
+        executable: str = _NOTIFY_SEND,
+    ) -> None:
+        self._runner = runner
+        self._executable = executable
 
     def notify(self, event: AlertEvent) -> None:
-        interface = self._interface_factory()
-        if not interface.isValid():
-            raise NotificationDeliveryError("desktop notification service is unavailable")
+        result = self._runner(self.command(event))
+        if result.returncode != 0:
+            detail = result.stderr.strip() or result.stdout.strip() or "unknown notify-send failure"
+            raise NotificationDeliveryError(
+                f"desktop notification delivery failed: {detail}"
+            )
 
-        summary = _summary(event.state)
-        body = _body(event)
-        reply = _call_notify(
-            interface,
-            "CodexBar",
-            0,
-            "",
-            summary,
-            body,
-            [],
-            {},
-            -1,
+    def command(self, event: AlertEvent) -> tuple[str, ...]:
+        return (
+            self._executable,
+            "--app-name=CodexBar",
+            f"--urgency={_urgency(event.state)}",
+            _summary(event.state),
+            _body(event),
         )
-        if reply.type() is QDBusMessage.MessageType.ErrorMessage:
-            detail = reply.errorMessage() or "unknown D-Bus notification error"
-            raise NotificationDeliveryError(detail)
+
+
+def notify_send_available() -> bool:
+    return shutil.which(_NOTIFY_SEND) is not None
+
+
+def _urgency(state: UsageWindowState) -> str:
+    if state is UsageWindowState.EXHAUSTED:
+        return "critical"
+    return "normal"
 
 
 def _summary(state: UsageWindowState) -> str:

@@ -1,6 +1,6 @@
 # v1.3 Tasks
 
-Status: contracts in progress
+Status: SQLite core in progress
 Requirement: REQ-HISTORY-001
 ADR: ADR-007
 
@@ -8,24 +8,20 @@ Tasks derive from `REQ-HISTORY-001` acceptance criteria and architectural invari
 
 ## Specification/architecture
 
-- [x] TASK-301 close REQ-HISTORY-001 behavioral decisions: 30-day retention, SQLite, `[start,end)`,
-  explicit history clear and persistence of every eligible CURRENT snapshot.
-- [x] TASK-302 accept ADR-007 covering SQLite schema, XDG data path, transactions, idempotency, schema
-  compatibility, corruption policy, retention and clear semantics.
+- [x] TASK-301 close REQ-HISTORY-001 behavioral decisions.
+- [x] TASK-302 accept ADR-007.
 
 ## Domain/application contracts
 
-- [x] TASK-303 define normalized historical value/result types needed for query and inspection without
-  introducing SQLite/UI dependencies.
-- [x] TASK-304 define history application ports for append, interval query, per-window query, prune,
-  inspection and clear.
-- [x] TASK-305 define normalized history error taxonomy and failure-containment contracts.
+- [x] TASK-303 define normalized historical value/result types.
+- [x] TASK-304 define history application ports.
+- [x] TASK-305 define normalized history error taxonomy.
 
 ## Acceptance tests first
 
-- [ ] TASK-306 add acceptance tests for AC-HISTORY-001..010: CURRENT capture, atomic multi-window persistence,
-  stale/error exclusion, normalized-data boundary, round trip, distinct observation timestamps and restart.
-- [ ] TASK-307 add acceptance tests for AC-HISTORY-011..017: chronological `[start,end)` queries,
+- [x] TASK-306 add acceptance tests for AC-HISTORY-001..010: CURRENT capture, atomic multi-window persistence,
+  stale exclusion, normalized-data boundary, round trip, distinct observation timestamps and restart.
+- [x] TASK-307 add acceptance tests for AC-HISTORY-011..017: chronological `[start,end)` queries,
   window-id filtering, historical labels, empty results and timezone validation.
 - [ ] TASK-308 add acceptance tests for AC-HISTORY-018..023: 30-day retention boundary, idempotency,
   cascade integrity and settings-schema independence.
@@ -38,11 +34,11 @@ Tasks derive from `REQ-HISTORY-001` acceptance criteria and architectural invari
 ## SQLite infrastructure
 
 - [ ] TASK-312 implement canonical XDG history path resolution with Snap-scoped fallback protection.
-- [ ] TASK-313 implement schema-v1 SQLite initialization and validation with foreign keys enabled.
-- [ ] TASK-314 implement canonical UTC timestamp and Decimal serialization/round trip.
-- [ ] TASK-315 implement deterministic normalized observation key and idempotent append transaction.
-- [ ] TASK-316 implement atomic snapshot + window persistence.
-- [ ] TASK-317 implement indexed interval and stable-window queries.
+- [x] TASK-313 implement minimal schema-v1 SQLite initialization with foreign keys enabled.
+- [x] TASK-314 implement canonical UTC timestamp and Decimal serialization/round trip.
+- [x] TASK-315 implement deterministic normalized observation key and idempotent append transaction.
+- [x] TASK-316 implement atomic snapshot + window persistence.
+- [x] TASK-317 implement indexed interval and stable-window queries.
 - [ ] TASK-318 implement fixed 30-day pruning with cascade and exact cutoff semantics.
 - [ ] TASK-319 implement inspection summary.
 - [ ] TASK-320 implement transactional history clear preserving schema.

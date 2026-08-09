@@ -1,13 +1,16 @@
-# notify-send housekeeping fix
+# mypy fix for TASK-306/307 increment
 
-No production behavior changes.
+No behavioral change.
 
-Fixes:
-- narrows the alert-specific architecture invariant so it does not conflict with the pre-existing,
-  legitimate subprocess usage in ui/native_indicator.py;
-- still proves that alert core/controller/launcher/tray do not depend on subprocess or the concrete
-  notification adapter;
-- removes unused sys imports from validation scripts.
+Fixes the missing return type annotation on the still-unimplemented
+`SqliteHistoryRepository.inspect()` stub:
+
+```python
+def inspect(self) -> HistoryInspection:
+    raise NotImplementedError("TASK-319")
+```
+
+Also imports `HistoryInspection`.
 
 Run:
 

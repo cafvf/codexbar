@@ -85,6 +85,18 @@ class HistoricalSnapshot:
         )
 
 
+@dataclass(frozen=True, slots=True)
+class HistoricalWindowSample:
+    """One window observation together with its historical time context."""
+
+    observed_at: datetime
+    source: UsageSource
+    observation: HistoricalWindowObservation
+
+    def __post_init__(self) -> None:
+        _require_aware(self.observed_at, "observed_at")
+
+
 class HistoryState(StrEnum):
     ABSENT = "absent"
     READY_EMPTY = "ready_empty"
@@ -153,10 +165,23 @@ class HistoryRepository(Protocol):
         self,
         window_id: UsageWindowId,
         interval: HistoryInterval,
-    ) -> tuple[HistoricalWindowObservation, ...]: ...
+    ) -> tuple[HistoricalWindowSample, ...]: ...
 
     def prune(self, cutoff: datetime) -> int: ...
 
     def inspect(self) -> HistoryInspection: ...
 
     def clear(self) -> None: ...
+
+
+class RecordHistorySnapshot:
+    """Offer eligible CURRENT snapshots to the history repository."""
+
+    def __init__(self, repository: HistoryRepository) -> None:
+        self._repository = repository
+
+    def execute(self, snapshot: UsageSnapshot) -> bool:
+        if snapshot.freshness is not Freshness.CURRENT:
+            return False
+        self._repository.append(HistoricalSnapshot.from_usage_snapshot(snapshot))
+        return True

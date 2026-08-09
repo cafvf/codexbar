@@ -62,3 +62,16 @@ Target evidence and limitations are recorded in `docs/VALIDATION.md`.
 | REQ-DESKTOP-001 | AC-DESKTOP-014 | `desktop._xdg_data_home`, `desktop._xdg_config_home` | desktop acceptance/unit Snap-XDG regression tests | validated |
 | REQ-DESKTOP-001 | AC-DESKTOP-015 | `scripts/install.sh`, `scripts/uninstall.sh` | installer policy unit test | validated |
 | REQ-DESKTOP-001 | AC-DESKTOP-016 | `scripts/install.sh` legacy-install notice | installer policy review + target observation | validated |
+## v1.1 — REQ-SETTINGS-001
+
+The detailed settings traceability matrix is maintained in
+`docs/TRACEABILITY-REQ-SETTINGS-001.md`.
+
+| Requirement | Criteria | Primary implementation | Primary evidence | Status |
+|---|---|---|---|---|
+| REQ-SETTINGS-001 | AC-SETTINGS-001..011 | `domain/settings.py`, `application/settings.py`, `infrastructure/settings.py` | settings acceptance/unit tests | validated |
+| REQ-SETTINGS-001 | AC-SETTINGS-012..014 | `UsagePolicy`, `ui/controller.py`, runtime timer integration | controller/runtime tests + target validation | validated |
+| REQ-SETTINGS-001 | AC-SETTINGS-015..019 | shared reset/get use cases and CLI | acceptance/CLI tests | validated |
+| REQ-SETTINGS-001 | AC-SETTINGS-020..024 | `ui/settings.py`, Qt tray, Ayatana Settings intent | GUI tests + Ubuntu/GNOME/Wayland validation | validated |
+
+ADR-005 records the schema-v1 persistence compatibility boundary. The v1.1 release scope is closed.

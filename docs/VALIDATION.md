@@ -239,3 +239,23 @@ All four v1.0 requirements are validated on the target Linux workstation. Packag
 aligned to `1.0.0`. The remaining release procedure is repository hygiene: run the final automated gates,
 review the staged diff, commit the release changes, verify a clean working tree and create annotated tag
 `v1.0.0`.
+## v1.1 — REQ-SETTINGS-001 release disposition
+
+Target workstation: Ubuntu/GNOME/Wayland.
+
+`REQ-SETTINGS-001` completed the specification-first implementation and target validation cycle. Automated
+gates passed at the implementation gate (`pytest`, `ruff`, strict `mypy`, `compileall`). Physical validation
+covered opening current settings, Save, live LOW-threshold/refresh application, Cancel, validation feedback,
+Reset, CLI inspection/reset and persistence across process restart.
+
+Target validation exposed one backend-parity defect: the Qt tray menu exposed Settings while the active
+Ayatana helper menu initially did not. The native helper intent contract and menu were corrected so both
+backends expose the Settings surface.
+
+The refresh interval domain was reconciled explicitly with the normative specification: `10..3600` seconds
+inclusive. Values near 3500 are valid; 3601 is invalid.
+
+Disposition: **REQ-SETTINGS-001 validated and closed.**
+
+Before creating the v1.1.0 tag, rerun the final release gates from `docs/GIT_WORKFLOW.md`. The final gate run
+belongs to release hygiene; it does not reopen the already completed requirement unless it finds a regression.

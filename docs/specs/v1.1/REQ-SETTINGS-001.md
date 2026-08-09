@@ -1,6 +1,6 @@
 # REQ-SETTINGS-001 — Persistent user settings
 
-Status: specified; tests intentionally red
+Status: validated and closed
 Priority: P0
 Release: v1.1
 Change taxonomy: EVOLUTION
@@ -157,11 +157,18 @@ behavior.
 - INV-SETTINGS-003: `UsagePolicy` remains the only domain policy used by `UsageWindow.state()`.
 - INV-SETTINGS-004: notification delivery is not implemented as a side effect of settings persistence.
 
-## Validation gate
+## Validation disposition
 
-This requirement remains open until:
-1. all acceptance and unit tests pass;
-2. existing v1.0 tests remain green;
-3. lint/type/compile gates pass;
-4. persistence ADR is accepted;
-5. the target Linux GUI validates open/edit/save/cancel/reset and live refresh-interval application.
+REQ-SETTINGS-001 is validated and closed.
+
+Evidence:
+1. acceptance and unit suites passed on the target checkout;
+2. the v1.0 regression suite remained green;
+3. repository-wide `pytest`, `ruff`, `mypy`, and `compileall` gates passed;
+4. ADR-005 is accepted and governs persistence/schema compatibility;
+5. the target Ubuntu/GNOME/Wayland workstation validated open/edit/save/cancel/reset, invalid-input
+   feedback, live refresh-interval application, LOW-threshold runtime application, native Ayatana
+   Settings-menu integration, and persistence across process restart.
+
+The accepted refresh-interval domain is inclusive `10..3600` seconds. Values such as 3500 are valid;
+3601 is invalid.

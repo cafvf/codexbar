@@ -1,6 +1,6 @@
-# Installation, desktop integration and uninstall
+# Installation, desktop integration, settings and uninstall
 
-CodexBar v1.0 uses a user-local `uv tool` installation. The installed application does **not** depend on the
+CodexBar 1.1 uses a user-local `uv tool` installation. The installed application does **not** depend on the
 source checkout after installation.
 
 ## Prerequisites
@@ -11,7 +11,7 @@ Required:
 - local Codex installed and authenticated;
 - `uv` available on `PATH`.
 
-For the native Ayatana label on Debian/Ubuntu-family systems:
+For the native Ayatana label/menu on Debian/Ubuntu-family systems:
 
 ```bash
 sudo apt update
@@ -55,8 +55,28 @@ Icon: ok
 Autostart: disabled
 ```
 
-The desktop application entry is installed in the user XDG applications directory and may be launched
-from the desktop's application menu.
+## Settings
+
+The GUI exposes **Settings** from the tray menu in both supported menu backends.
+
+CLI inspection/reset:
+
+```bash
+"$(uv tool dir --bin)/codexbar" settings show
+"$(uv tool dir --bin)/codexbar" settings reset
+```
+
+Managed values:
+- LOW remaining threshold: default `0.20`, valid `0 < threshold < 1`;
+- refresh interval: default `60` seconds, valid `10..3600` seconds;
+- notifications enabled: default `true`; delivery is not implemented in v1.1.
+
+Canonical settings file:
+- `$XDG_CONFIG_HOME/codexbar/settings.json` when the host-user XDG config path is valid;
+- otherwise `$HOME/.config/codexbar/settings.json`.
+
+A malformed/unsupported settings document does not prevent startup. Defaults become effective and
+`settings show` exposes the diagnostic. Reading a bad document does not silently replace it.
 
 ## Autostart
 
@@ -66,19 +86,13 @@ Autostart is opt-in:
 "$(uv tool dir --bin)/codexbar" desktop autostart enable
 ```
 
-Check:
-
-```bash
-"$(uv tool dir --bin)/codexbar" desktop status
-```
-
 Disable:
 
 ```bash
 "$(uv tool dir --bin)/codexbar" desktop autostart disable
 ```
 
-No autostart file is created by the normal installation command.
+No autostart file is created by normal installation.
 
 ## Checkout-independence check
 
@@ -90,7 +104,7 @@ mv codexbar codexbar.source-backup
 "$(uv tool dir --bin)/codexbar" --gui
 ```
 
-Restore the source directory afterward if you want to use the provided uninstall script:
+Restore the source directory afterward if desired:
 
 ```bash
 mv codexbar.source-backup codexbar
@@ -102,8 +116,8 @@ mv codexbar.source-backup codexbar
 "$(uv tool dir --bin)/codexbar" --diagnose-indicator
 ```
 
-The system-Python helper is launched with a sanitized environment to prevent Snap/IDE runtime library
-paths from contaminating the host GI/GTK stack. Native failure must fall back to the Qt tray.
+The system-Python helper is launched with a sanitized environment to prevent Snap/IDE runtime library paths
+from contaminating the host GI/GTK stack. Native failure falls back to the Qt tray.
 
 ## Uninstall
 
@@ -113,35 +127,33 @@ If you still have a source/release tree:
 ./scripts/uninstall.sh
 ```
 
-Without the source tree, use the installed command first to remove desktop integration, then remove the uv
-tool:
+Without the source tree:
 
 ```bash
 "$(uv tool dir --bin)/codexbar" desktop uninstall
 uv tool uninstall codexbar
 ```
 
-The desktop uninstall removes only CodexBar-managed application, icon and autostart files. It does not
-recursively remove shared XDG directories or unrelated files.
+Desktop uninstall removes only CodexBar-managed application, icon and autostart files. Persistent application
+settings are user data and are not recursively deleted as part of desktop integration removal.
 
 ## Development environment
-
-Development remains separate from installation:
 
 ```bash
 uv sync --extra dev --extra gui --extra native-indicator
 uv run pytest -ra
+uv run ruff check src tests
+uv run mypy
 uv run python -m compileall -q src
 ```
 
-`uv.lock` is versioned for reproducibility of development and CI. The installed uv tool does not include the
-`dev` extra.
+`uv.lock` is versioned for reproducibility. The installed uv tool does not include the `dev` extra.
 
 ## VS Code / Snap environments
+
 The supported installer normalizes installation paths even when launched from a Snap-packaged IDE. It
 installs the uv tool under `$HOME/.local/share/uv/tools`, the executable under `$HOME/.local/bin`, desktop
-data under `$HOME/.local/share`, and autostart configuration under `$HOME/.config`.
+data under `$HOME/.local/share`, and application/autostart configuration under `$HOME/.config`.
 
-If a prior development install was accidentally created below `$HOME/snap/code/<revision>/...`, the
-installer reports the exact legacy `XDG_DATA_HOME` and a cleanup command. Validate the canonical install
-first; cleanup is intentionally explicit rather than automatic.
+If a prior development install was accidentally created below `$HOME/snap/code/<revision>/...`, validate the
+canonical install first; cleanup is intentionally explicit rather than automatic.

@@ -3,7 +3,6 @@
 ## Files that belong in Git
 
 Commit:
-
 - source under `src/`;
 - tests;
 - specifications, ADRs, tasks and validation records;
@@ -12,7 +11,6 @@ Commit:
 - project-owned static assets required at runtime.
 
 Do not commit:
-
 - `.venv/`;
 - `__pycache__/`;
 - `.pytest_cache/`, `.mypy_cache/`, `.ruff_cache/`;
@@ -41,6 +39,8 @@ Run the release-relevant checks:
 
 ```bash
 uv run pytest -ra
+uv run ruff check src tests
+uv run mypy
 uv run python -m compileall -q src
 git status
 ```
@@ -50,75 +50,70 @@ Stage intentionally:
 ```bash
 git add <files-or-directories>
 git diff --cached
-```
-
-Then commit:
-
-```bash
 git commit -m "type: concise description"
 ```
 
-Suggested conventional prefixes: `feat`, `fix`, `test`, `docs`, `refactor`, `build`, `chore`.
+Suggested prefixes: `feat`, `fix`, `test`, `docs`, `refactor`, `build`, `chore`, `release`.
 
 ## Lockfile policy
 
 `uv.lock` is versioned because CodexBar is an application and reproducible development/CI resolution is a
-project requirement. When `pyproject.toml` changes dependency resolution, regenerate/sync and commit the
-corresponding `uv.lock` change.
+project requirement. After changing package metadata or dependencies in `pyproject.toml`, run:
+
+```bash
+uv lock
+```
+
+Review and commit the corresponding lockfile change.
 
 ## Specification-first rule
 
 A behavior change is not complete merely because code and tests pass. Follow `AGENTS.md`:
 
-1. identify the affected `REQ-*`, `UC-*`, and `AC-*`;
+1. identify affected `REQ-*`, `UC-*` and `AC-*`;
 2. update normative specification first when behavior changes;
-3. add/change the acceptance or regression test;
+3. add/change acceptance or regression tests;
 4. implement;
 5. run focused and full tests;
 6. update traceability, tasks and validation evidence.
 
 ## Target-system evidence
 
-Manual target-system validation belongs in `docs/VALIDATION.md`. Record what was actually observed and
-distinguish it from automated evidence. Never claim a desktop capability was validated merely because a
-mock or headless test passed.
-
-## v1.0 release-candidate checks
-
-Before tagging the first desktop-installable release, run:
-
-```bash
-uv sync --extra dev --extra gui --extra native-indicator
-uv run pytest -ra
-uv run ruff check src tests
-uv run mypy
-uv run python -m compileall -q src
-```
-
-Then perform the target-system REQ-DESKTOP-001 validation from `docs/specs/v1.0/REQ-DESKTOP-001.md`.
-Do not create the v1.0 tag while that validation gate is still open.
+Manual target-system validation belongs in `docs/VALIDATION.md` or a requirement-specific validation record.
+Record what was actually observed and distinguish it from automated evidence.
 
 ## Release tagging
 
-For a release candidate, first run all committed gates:
+Before every release tag:
 
 ```bash
+uv lock
 uv sync --extra dev --extra gui --extra native-indicator
 uv run pytest -ra
 uv run ruff check src tests
 uv run mypy
 uv run python -m compileall -q src
+git status
+git diff
 ```
 
-Then review and commit all intended release changes. Create a release tag only from a clean working tree:
+Review and commit all intended release changes. Create an annotated tag only from a clean working tree.
+
+For release `X.Y.Z`:
 
 ```bash
 git status
 git log --oneline --decorate -n 10
-git tag -a v1.0.0 -m "CodexBar 1.0.0"
-git show --stat v1.0.0
+git tag -a vX.Y.Z -m "CodexBar X.Y.Z"
+git show --stat vX.Y.Z
 git push origin main
-git push origin v1.0.0
+git push origin vX.Y.Z
 ```
 
-The annotated tag version SHALL agree with `pyproject.toml` and `codexbar.__version__`.
+The annotated tag version SHALL agree with all committed version sources:
+- `[project].version` in `pyproject.toml`;
+- `codexbar.__version__` in `src/codexbar/__init__.py`;
+- the local `codexbar` project entry in `uv.lock`.
+
+`tests/unit/test_release_metadata.py` guards the first two sources; regenerating `uv.lock` after metadata
+changes keeps the third aligned.

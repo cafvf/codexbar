@@ -1,6 +1,6 @@
 # v1.1 Tasks
 
-Status: target GUI validation phase
+Status: REQ-SETTINGS-001 complete
 
 ## REQ-SETTINGS-001
 
@@ -19,5 +19,5 @@ Status: target GUI validation phase
 - [x] TASK-112 implement `settings show` and `settings reset` CLI surfaces.
 - [x] TASK-113 implement Qt settings surface with Save/Cancel/Reset and validation feedback.
 - [x] TASK-114 run repository-wide pytest/ruff/mypy/compileall gates.
-- [ ] TASK-115 validate GUI settings lifecycle and restart persistence on target Linux workstation.
-- [ ] TASK-116 close traceability and release documentation for REQ-SETTINGS-001.
+- [x] TASK-115 validate GUI settings lifecycle and restart persistence on target Linux workstation.
+- [x] TASK-116 close traceability and release documentation for REQ-SETTINGS-001.

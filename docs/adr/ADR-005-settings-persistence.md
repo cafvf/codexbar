@@ -1,7 +1,8 @@
 # ADR-005 — Settings persistence and compatibility boundary
 
-Status: accepted for REQ-SETTINGS-001 implementation
+Status: accepted
 Date: 2026-08-08
+Release: v1.1
 
 ## Context
 
@@ -21,7 +22,7 @@ concerns into the domain.
    to the open interval `(0, 1)` by `AppSettings`.
 3. `AppSettings.usage_policy()` is the only bridge from persisted/user configuration to the existing
    `UsagePolicy`; `UsageWindow.state()` remains unchanged.
-4. Infrastructure will persist schema version 1 as JSON under the XDG configuration directory.
+4. Infrastructure persists schema version 1 as JSON under the XDG configuration directory.
 5. Decimal thresholds are serialized as decimal strings rather than JSON floating-point numbers.
 6. Persisted documents are treated as an external/volatile boundary:
    - exact schema version is required;
@@ -36,8 +37,8 @@ concerns into the domain.
 
 ## Consequences
 
-- Domain tests can validate settings semantics without filesystem or GUI dependencies.
-- Persistence can evolve behind an application port without changing `UsagePolicy` or provider contracts.
+- Domain tests validate settings semantics without filesystem or GUI dependencies.
+- Persistence evolves behind an application port without changing provider contracts.
 - Corruption recovery favors availability while preserving evidence for diagnosis.
 - The initial implementation carries a small explicit schema/versioning cost in exchange for predictable
   future evolution.
@@ -56,3 +57,8 @@ Rejected because installed CodexBar is explicitly independent of the checkout.
 
 ### Silently accept unknown fields/schema versions
 Rejected because it turns misspellings or future semantics into undocumented behavior.
+
+## Validation
+
+The decision was implemented and validated under `REQ-SETTINGS-001` for v1.1. Schema v1 is therefore a
+released compatibility boundary; future format evolution requires a new explicit ADR/migration decision.

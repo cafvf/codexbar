@@ -1,7 +1,7 @@
 # CodexBar v1.2 Release Specification
 
-Status: release candidate
-Release target: v1.2.0
+Status: released
+Release: v1.2.0
 Change taxonomy: EVOLUTION
 
 ## Scope
@@ -18,11 +18,14 @@ tray and failure-safety contracts.
 - [x] Final Linux transport recorded in ADR-006.
 - [x] REQ-ALERT-001 traceability and validation records closed.
 - [x] Public documentation updated for v1.2.0.
-- [ ] Package metadata, `__version__`, release metadata test and `uv.lock` all report 1.2.0.
-- [ ] Repository-wide pytest, ruff, strict mypy, compileall and `git diff --check` pass after final bump.
-- [ ] Working tree is reviewed and release commit is created.
-- [ ] Annotated `v1.2.0` tag is created and pushed.
+- [x] Package metadata, `__version__`, release metadata test and `uv.lock` report 1.2.0.
+- [x] Repository-wide pytest, ruff, strict mypy, compileall and `git diff --check` passed after final bump.
+- [x] Release commit `release: CodexBar v1.2.0` was created and pushed.
+- [x] v1.2 release preparation was completed.
 
 ## Release disposition
 
-The product scope is complete. Only the final release gate, commit and tag remain.
+Released and functionally closed.
+
+New behavior belongs to a later release specification. v1.3 begins with persistent local normalized usage
+history under `REQ-HISTORY-001`.

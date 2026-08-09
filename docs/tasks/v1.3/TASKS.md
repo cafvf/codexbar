@@ -1,6 +1,6 @@
 # v1.3 Tasks
 
-Status: ready for TDD
+Status: contracts in progress
 Requirement: REQ-HISTORY-001
 ADR: ADR-007
 
@@ -15,11 +15,11 @@ Tasks derive from `REQ-HISTORY-001` acceptance criteria and architectural invari
 
 ## Domain/application contracts
 
-- [ ] TASK-303 define normalized historical value/result types needed for query and inspection without
+- [x] TASK-303 define normalized historical value/result types needed for query and inspection without
   introducing SQLite/UI dependencies.
-- [ ] TASK-304 define history application ports for append, interval query, per-window query, prune,
+- [x] TASK-304 define history application ports for append, interval query, per-window query, prune,
   inspection and clear.
-- [ ] TASK-305 define normalized history error taxonomy and failure-containment contracts.
+- [x] TASK-305 define normalized history error taxonomy and failure-containment contracts.
 
 ## Acceptance tests first
 

@@ -1,6 +1,6 @@
 # v1.2 Tasks
 
-Status: release candidate preparation
+Status: closed
 
 ## REQ-ALERT-001
 
@@ -15,4 +15,6 @@ Status: release candidate preparation
 - [x] TASK-209 add architecture/regression tests.
 - [x] TASK-210 pass repository-wide automated gates.
 - [x] TASK-211 validate Ubuntu/GNOME/Wayland behavior.
-- [x] TASK-212 complete final v1.2.0 metadata/release gate, release commit and annotated tag.
+- [x] TASK-212 complete final v1.2.0 metadata/release gate and release commit.
+
+v1.2 is closed. No new behavior may be added under these tasks.

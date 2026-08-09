@@ -56,3 +56,11 @@ class SettingsReadError(SettingsError):
 
 class SettingsWriteError(SettingsError):
     """Settings storage cannot be updated safely."""
+
+
+class NotificationError(CodexBarError):
+    """Base class for expected desktop-notification failures."""
+
+
+class NotificationDeliveryError(NotificationError):
+    """Desktop notification transport could not deliver an alert."""

@@ -1,26 +1,13 @@
-# REQ-ALERT-001 — Target validation procedure
+# REQ-ALERT-001 — Target validation record
 
-Status: pending target validation
+Status: validated
 Target: Ubuntu / GNOME / Wayland
 Release: v1.2
+Date: 2026-08-08/09
 
-## Transport prerequisite
+## Automated evidence
 
-Check the revised notification transport:
-
-```bash
-command -v notify-send
-notify-send --app-name=CodexBar --urgency=normal   "CodexBar control test" "This confirms the host notification client works."
-```
-
-If `notify-send` is missing on Ubuntu/Debian:
-
-```bash
-sudo apt update
-sudo apt install libnotify-bin
-```
-
-## Automated gate
+The complete repository gate passed during v1.2 development:
 
 ```bash
 uv run pytest -ra
@@ -29,28 +16,62 @@ uv run mypy
 uv run python -m compileall -q src scripts
 ```
 
-## Adapter diagnostic
+Acceptance, unit, architecture and regression coverage included baseline semantics, LOW/EXHAUSTED
+transitions, deduplication, recovery/re-arm, disabled/re-enabled notifications, stale/error behavior,
+restart baseline, multi-window events, schema stability and delivery-failure isolation.
+
+## Transport discovery
+
+The initial PySide6.QtDBus adapter reached the GNOME notification service but was rejected because Python
+values were marshalled with the wrong D-Bus signature. GNOME reported:
+
+- actual: `(sisssava{sv}i)`;
+- expected: `(susssasa{sv}i)`.
+
+This exposed two binding-level mismatches: INT32 vs UINT32 for `replaces_id`, and array-of-variant vs
+array-of-string for empty actions.
+
+ADR-006 was revised. The final production transport uses distro-native `notify-send` / `libnotify-bin`.
+
+## Final transport validation
+
+Diagnostic:
 
 ```bash
 uv run python scripts/diagnose_notifications.py
 ```
 
-Expected: return code 0 and a visible `CodexBar diagnostic` notification.
+Observed on target:
+- `/usr/bin/notify-send` found;
+- return code `0`;
+- positive notification id returned;
+- visible GNOME notification presented.
 
-## Controlled scenarios
+## Physical alert validation
 
-Run individually:
+Controlled production-path validation used `scripts/validate_alerts.py`.
 
-```bash
-uv run python scripts/validate_alerts.py low --delay 1
-uv run python scripts/validate_alerts.py exhausted --delay 1
-uv run python scripts/validate_alerts.py dedupe --delay 1
-uv run python scripts/validate_alerts.py rearm --delay 1
-uv run python scripts/validate_alerts.py disabled --delay 1
-uv run python scripts/validate_alerts.py restart --delay 1
-uv run python scripts/validate_alerts.py multi-window --delay 1
-uv run python scripts/validate_alerts.py failure --delay 1
-```
+Confirmed:
+- silent initial baseline;
+- visible LOW notification;
+- visible EXHAUSTED notification;
+- LOW and EXHAUSTED are distinguishable;
+- affected usage window is identified;
+- transition generation and delivery use the production `AlertService` and final notification adapter.
 
-AC-ALERT-026 passes only when the target desktop visibly presents distinguishable LOW and EXHAUSTED
-notifications identifying the affected window.
+Additional automated scenarios cover deduplication, re-arm, disabled/re-enabled behavior, restart baseline,
+multi-window behavior, stale/provider failures and delivery-failure isolation.
+
+## AC-ALERT-026
+
+PASS.
+
+The target desktop visibly presented distinguishable LOW and EXHAUSTED notifications identifying the
+affected window.
+
+## Final disposition
+
+REQ-ALERT-001 is validated and closed. TASK-211 is complete.
+
+Any future change from `notify-send`, change in alert retry/cooldown policy, or persisted deduplication state
+requires a new compatibility/behavior decision rather than an implicit modification of v1.2 semantics.

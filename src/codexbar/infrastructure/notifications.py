@@ -5,9 +5,8 @@ import subprocess
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 
-from codexbar.application.alerts import AlertEvent
+from codexbar.application.notifications import NotificationMessage
 from codexbar.domain.errors import NotificationDeliveryError
-from codexbar.domain.models import UsageWindowState
 
 _NOTIFY_SEND = "notify-send"
 _COMMAND_TIMEOUT_SECONDS = 5.0
@@ -49,8 +48,6 @@ def _default_runner(command: Sequence[str]) -> CommandResult:
 
 
 class NotifySendNotificationAdapter:
-    """Deliver normalized alerts through the distro-native libnotify client."""
-
     def __init__(
         self,
         runner: CommandRunner = _default_runner,
@@ -60,44 +57,27 @@ class NotifySendNotificationAdapter:
         self._runner = runner
         self._executable = executable
 
-    def notify(self, event: AlertEvent) -> None:
-        result = self._runner(self.command(event))
+    def notify(self, message: NotificationMessage) -> None:
+        result = self._runner(self.command(message))
         if result.returncode != 0:
-            detail = result.stderr.strip() or result.stdout.strip() or "unknown notify-send failure"
+            detail = (
+                result.stderr.strip()
+                or result.stdout.strip()
+                or "unknown notify-send failure"
+            )
             raise NotificationDeliveryError(
                 f"desktop notification delivery failed: {detail}"
             )
 
-    def command(self, event: AlertEvent) -> tuple[str, ...]:
+    def command(self, message: NotificationMessage) -> tuple[str, ...]:
         return (
             self._executable,
             "--app-name=CodexBar",
-            f"--urgency={_urgency(event.state)}",
-            _summary(event.state),
-            _body(event),
+            f"--urgency={message.urgency.value}",
+            message.summary,
+            message.body,
         )
 
 
 def notify_send_available() -> bool:
     return shutil.which(_NOTIFY_SEND) is not None
-
-
-def _urgency(state: UsageWindowState) -> str:
-    if state is UsageWindowState.EXHAUSTED:
-        return "critical"
-    return "normal"
-
-
-def _summary(state: UsageWindowState) -> str:
-    if state is UsageWindowState.EXHAUSTED:
-        return "CodexBar usage exhausted"
-    return "CodexBar usage low"
-
-
-def _body(event: AlertEvent) -> str:
-    percent = format(event.remaining.percent.normalize(), "f")
-    text = f"{event.label}: {percent}% remaining"
-    if event.resets_at is not None:
-        reset = event.resets_at.astimezone().strftime("%Y-%m-%d %H:%M %Z")
-        return f"{text}. Resets {reset}."
-    return text

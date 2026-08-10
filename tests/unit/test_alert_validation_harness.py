@@ -3,7 +3,7 @@ from __future__ import annotations
 import importlib.util
 from pathlib import Path
 
-from codexbar.application.alerts import AlertEvent
+from codexbar.application.notifications import NotificationMessage
 
 
 def load_harness():
@@ -18,10 +18,10 @@ def load_harness():
 
 class RecordingNotifier:
     def __init__(self) -> None:
-        self.events: list[AlertEvent] = []
+        self.events: list[NotificationMessage] = []
 
-    def notify(self, event: AlertEvent) -> None:
-        self.events.append(event)
+    def notify(self, message: NotificationMessage) -> None:
+        self.events.append(message)
 
 
 def test_validation_harness_low_scenario_emits_exactly_one_low_event() -> None:
@@ -31,7 +31,7 @@ def test_validation_harness_low_scenario_emits_exactly_one_low_event() -> None:
     harness.scenario_low(notifier, 0)
 
     assert len(notifier.events) == 1
-    assert notifier.events[0].state.value == "low"
+    assert notifier.events[0].summary == "CodexBar usage low"
 
 
 def test_validation_harness_dedupe_scenario_does_not_repeat_low() -> None:
@@ -58,9 +58,9 @@ def test_validation_harness_multi_window_scenario_emits_two_distinct_events() ->
 
     harness.scenario_multi(notifier, 0)
 
-    assert [event.window_id.value for event in notifier.events] == [
-        "five_hour",
-        "weekly",
+    assert [message.body.split(":", 1)[0] for message in notifier.events] == [
+        "5 hours",
+        "Weekly",
     ]
 
 

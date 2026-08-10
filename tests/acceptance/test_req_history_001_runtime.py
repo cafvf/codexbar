@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 
-from codexbar.application.alerts import AlertEvent, AlertService
+from codexbar.application.alerts import AlertService
 from codexbar.application.history import (
     HistoricalSnapshot,
     HistoricalWindowSample,
@@ -17,6 +17,7 @@ from codexbar.application.history_runtime import (
     HistoryCapturingUsageProvider,
     HistoryService,
 )
+from codexbar.application.notifications import NotificationMessage
 from codexbar.application.refresh import RefreshCoordinator
 from codexbar.application.use_cases import GetCurrentUsage
 from codexbar.domain.errors import UsageSourceError
@@ -26,7 +27,6 @@ from codexbar.domain.models import (
     UsageSource,
     UsageWindow,
     UsageWindowId,
-    UsageWindowState,
 )
 from codexbar.ui.controller import TrayController, TrayPhase
 
@@ -61,10 +61,10 @@ class SequenceProvider:
 
 class RecordingNotifier:
     def __init__(self) -> None:
-        self.events: list[AlertEvent] = []
+        self.events: list[NotificationMessage] = []
 
-    def notify(self, event: AlertEvent) -> None:
-        self.events.append(event)
+    def notify(self, message: NotificationMessage) -> None:
+        self.events.append(message)
 
 
 class RecordingHistoryRepository(HistoryRepository):
@@ -187,7 +187,7 @@ def test_task_324_append_failure_does_not_break_current_state_or_alerts() -> Non
     assert second.phase is TrayPhase.FRESH
     assert second.usage is not None
     assert second.usage.windows[0].percent_left == 10
-    assert [event.state for event in notifier.events] == [UsageWindowState.LOW]
+    assert [message.summary for message in notifier.events] == ["CodexBar usage low"]
 
 
 def test_task_324_prune_failure_does_not_break_current_state_or_alerts() -> None:
@@ -210,7 +210,7 @@ def test_task_324_prune_failure_does_not_break_current_state_or_alerts() -> None
     state = refresh_once(controller)
 
     assert state.phase is TrayPhase.FRESH
-    assert [event.state for event in notifier.events] == [UsageWindowState.LOW]
+    assert [message.summary for message in notifier.events] == ["CodexBar usage low"]
 
 
 def test_ac_history_037_clear_does_not_change_current_or_alert_runtime_state() -> None:
@@ -243,4 +243,4 @@ def test_ac_history_037_clear_does_not_change_current_or_alert_runtime_state() -
     assert unchanged_low_state.phase is TrayPhase.FRESH
     assert unchanged_low_state.usage is not None
     assert unchanged_low_state.usage.windows[0].percent_left == 9
-    assert [event.state for event in notifier.events] == [UsageWindowState.LOW]
+    assert [message.summary for message in notifier.events] == ["CodexBar usage low"]

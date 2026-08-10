@@ -7,7 +7,8 @@ from decimal import Decimal
 from pathlib import Path
 from typing import Any
 
-from codexbar.application.alerts import AlertEvent, AlertService
+from codexbar.application.alerts import AlertService
+from codexbar.application.notifications import NotificationMessage
 from codexbar.application.refresh import RefreshCoordinator
 from codexbar.application.use_cases import GetCurrentUsage
 from codexbar.domain.errors import NotificationDeliveryError, UsageSourceError
@@ -51,10 +52,10 @@ class SequenceProvider:
 
 class FailingThenRecordingNotifier:
     def __init__(self) -> None:
-        self.attempts: list[AlertEvent] = []
+        self.attempts: list[NotificationMessage] = []
 
-    def notify(self, event: AlertEvent) -> None:
-        self.attempts.append(event)
+    def notify(self, message: NotificationMessage) -> None:
+        self.attempts.append(message)
         if len(self.attempts) == 1:
             raise NotificationDeliveryError("expected test failure")
 
@@ -167,7 +168,7 @@ def test_ac_alert_025_delivery_failure_does_not_prevent_later_attempt() -> None:
         refresh_once(controller)
 
     assert len(notifier.attempts) == 2
-    assert notifier.attempts[-1].state is UsageWindowState.EXHAUSTED
+    assert notifier.attempts[-1].summary == "CodexBar usage exhausted"
     assert controller.state.phase is TrayPhase.FRESH
 
 
@@ -198,4 +199,4 @@ def test_refresh_error_becomes_stale_without_fabricating_alert_transition() -> N
 
     assert controller.state.phase is TrayPhase.FRESH
     assert len(notifier.attempts) == 1
-    assert notifier.attempts[0].state is UsageWindowState.LOW
+    assert notifier.attempts[0].summary == "CodexBar usage low"

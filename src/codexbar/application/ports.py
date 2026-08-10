@@ -1,11 +1,9 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Protocol
+from typing import Protocol
 
+from codexbar.application.notifications import NotificationMessage
 from codexbar.domain.models import UsageSnapshot
-
-if TYPE_CHECKING:
-    from codexbar.application.alerts import AlertEvent
 
 
 class UsageProvider(Protocol):
@@ -13,4 +11,4 @@ class UsageProvider(Protocol):
 
 
 class NotificationPort(Protocol):
-    def notify(self, event: AlertEvent) -> None: ...
+    def notify(self, message: NotificationMessage) -> None: ...

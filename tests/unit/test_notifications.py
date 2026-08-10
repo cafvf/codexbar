@@ -5,7 +5,7 @@ from decimal import Decimal
 
 import pytest
 
-from codexbar.application.alerts import AlertEvent
+from codexbar.application.alerts import AlertEvent, usage_alert_message
 from codexbar.domain.errors import NotificationDeliveryError
 from codexbar.domain.models import Fraction, UsageWindowId, UsageWindowState
 from codexbar.infrastructure.notifications import CommandResult, NotifySendNotificationAdapter
@@ -46,7 +46,7 @@ def test_notify_send_adapter_builds_normalized_command(
         return CommandResult(returncode=0)
 
     adapter = NotifySendNotificationAdapter(runner)
-    adapter.notify(event(state, remaining))
+    adapter.notify(usage_alert_message(event(state, remaining)))
 
     assert len(commands) == 1
     command = commands[0]
@@ -64,7 +64,7 @@ def test_notify_send_adapter_normalizes_nonzero_exit() -> None:
     )
 
     with pytest.raises(NotificationDeliveryError, match="daemon unavailable"):
-        adapter.notify(event(UsageWindowState.LOW, "0.15"))
+        adapter.notify(usage_alert_message(event(UsageWindowState.LOW, "0.15")))
 
 
 def test_alert_event_contract_excludes_provider_payload_fields() -> None:

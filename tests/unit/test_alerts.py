@@ -4,6 +4,7 @@ from datetime import UTC, datetime
 from decimal import Decimal
 
 from codexbar.application.alerts import AlertEvent, AlertService, AlertTransitionTracker
+from codexbar.application.notifications import NotificationMessage
 from codexbar.domain.errors import NotificationDeliveryError
 from codexbar.domain.models import (
     Fraction,
@@ -21,11 +22,11 @@ OBSERVED_AT = datetime(2026, 8, 8, 12, 0, tzinfo=UTC)
 
 class RecordingNotifier:
     def __init__(self, *, fail: bool = False) -> None:
-        self.events: list[AlertEvent] = []
+        self.events: list[NotificationMessage] = []
         self.fail = fail
 
-    def notify(self, event: AlertEvent) -> None:
-        self.events.append(event)
+    def notify(self, message: NotificationMessage) -> None:
+        self.events.append(message)
         if self.fail:
             raise NotificationDeliveryError("notification transport failed")
 
@@ -249,7 +250,7 @@ def test_reenabled_notifications_deliver_a_later_new_transition() -> None:
     )
 
     assert len(notifier.events) == 1
-    assert notifier.events[0].state is UsageWindowState.EXHAUSTED
+    assert notifier.events[0].summary == "CodexBar usage exhausted"
 
 
 def test_normalized_delivery_failure_is_contained() -> None:

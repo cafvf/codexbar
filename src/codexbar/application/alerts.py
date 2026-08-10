@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime
 
+from codexbar.application.notifications import NotificationMessage, NotificationUrgency
 from codexbar.application.ports import NotificationPort
 from codexbar.domain.errors import NotificationDeliveryError
 from codexbar.domain.models import (
@@ -25,8 +26,6 @@ class AlertEvent:
 
 
 class AlertTransitionTracker:
-    """Track eligible per-window states and emit constrained-state transitions."""
-
     def __init__(self) -> None:
         self._states: dict[UsageWindowId, UsageWindowState] = {}
 
@@ -43,28 +42,43 @@ class AlertTransitionTracker:
             current = window.state(policy)
             previous = self._states.get(window.id)
             self._states[window.id] = current
-
             if previous is None or previous is current:
                 continue
             if current not in {UsageWindowState.LOW, UsageWindowState.EXHAUSTED}:
                 continue
-
             events.append(
                 AlertEvent(
-                    window_id=window.id,
-                    label=window.label,
-                    state=current,
-                    remaining=window.remaining,
-                    resets_at=window.resets_at,
+                    window.id,
+                    window.label,
+                    current,
+                    window.remaining,
+                    window.resets_at,
                 )
             )
-
         return tuple(events)
 
 
-class AlertService:
-    """Apply notification enablement while always advancing eligible transition state."""
+def usage_alert_message(event: AlertEvent) -> NotificationMessage:
+    percent = format(event.remaining.percent.normalize(), "f")
+    body = f"{event.label}: {percent}% remaining"
+    if event.resets_at is not None:
+        reset = event.resets_at.astimezone().strftime("%Y-%m-%d %H:%M %Z")
+        body = f"{body}. Resets {reset}."
 
+    if event.state is UsageWindowState.EXHAUSTED:
+        return NotificationMessage(
+            "CodexBar usage exhausted",
+            body,
+            NotificationUrgency.CRITICAL,
+        )
+    return NotificationMessage(
+        "CodexBar usage low",
+        body,
+        NotificationUrgency.NORMAL,
+    )
+
+
+class AlertService:
     def __init__(
         self,
         notifier: NotificationPort,
@@ -86,7 +100,7 @@ class AlertService:
 
         for event in events:
             try:
-                self._notifier.notify(event)
+                self._notifier.notify(usage_alert_message(event))
             except NotificationDeliveryError:
                 continue
         return events

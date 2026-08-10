@@ -136,7 +136,8 @@ def test_task_322_current_refresh_is_captured_and_pruned_in_worker_path() -> Non
 
     assert state.phase is TrayPhase.FRESH
     assert len(repository.appended) == 1
-    assert repository.cutoffs == [T0 - timedelta(days=30)]
+    # v1.6 AC-1610 / DEC-1602 supersedes the v1.3 30-day retention contract.
+    assert repository.cutoffs == [T0 - timedelta(days=180)]
 
 
 def test_task_323_provider_error_stale_fallback_is_not_captured_again() -> None:

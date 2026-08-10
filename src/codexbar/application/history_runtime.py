@@ -12,7 +12,7 @@ from codexbar.application.history import (
 from codexbar.application.ports import UsageProvider
 from codexbar.domain.models import Freshness, UsageSnapshot
 
-_HISTORY_RETENTION = timedelta(days=30)
+HISTORY_RETENTION = timedelta(days=180)
 
 
 @dataclass(frozen=True, slots=True)
@@ -72,7 +72,7 @@ class HistoryService:
         now = self._clock()
         if now.tzinfo is None or now.utcoffset() is None:
             raise ValueError("history maintenance clock must be timezone-aware")
-        return now.astimezone(UTC) - _HISTORY_RETENTION
+        return now.astimezone(UTC) - HISTORY_RETENTION
 
 
 class HistoryCapturingUsageProvider:

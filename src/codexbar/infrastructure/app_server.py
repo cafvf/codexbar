@@ -112,29 +112,35 @@ class SubprocessJsonRpcTransport:
         return f"{prefix}: {detail}" if detail else prefix
 
 
-class CodexAppServerProvider:
-    """UsageProvider backed by Codex's stable local app-server account API."""
+class CodexAppServerGateway:
+    """Reusable initialized JSON-RPC boundary for one Codex app-server operation."""
 
     def __init__(
         self,
         transport_factory: Callable[[], JsonRpcTransport] | None = None,
         *,
         timeout_seconds: float = 5.0,
-        clock: Callable[[], datetime] | None = None,
     ) -> None:
         self._transport_factory = transport_factory or SubprocessJsonRpcTransport
         self._timeout_seconds = timeout_seconds
-        self._clock = clock or (lambda: datetime.now(UTC))
 
-    def get_usage(self) -> UsageSnapshot:
+    def call(
+        self,
+        method: str,
+        *,
+        request_id: int = 1,
+        params: JsonObject | None = None,
+    ) -> JsonObject:
+        """Open, initialize, execute one request, and always close the transport."""
         transport = self._transport_factory()
         try:
             self._initialize(transport)
-            response = self._request(transport, 1, "account/rateLimits/read")
-            observed_at = self._clock()
-            if observed_at.tzinfo is None or observed_at.utcoffset() is None:
-                raise ValueError("provider clock must return a timezone-aware datetime")
-            return parse_rate_limits_response(response, observed_at=observed_at)
+            return self._request(
+                transport,
+                request_id=request_id,
+                method=method,
+                params=params,
+            )
         finally:
             transport.close()
 
@@ -155,8 +161,18 @@ class CodexAppServerProvider:
         self._wait_for_id(transport, 0)
         transport.send({"method": "initialized", "params": {}})
 
-    def _request(self, transport: JsonRpcTransport, request_id: int, method: str) -> JsonObject:
-        transport.send({"method": method, "id": request_id})
+    def _request(
+        self,
+        transport: JsonRpcTransport,
+        *,
+        request_id: int,
+        method: str,
+        params: JsonObject | None,
+    ) -> JsonObject:
+        message: JsonObject = {"method": method, "id": request_id}
+        if params is not None:
+            message["params"] = params
+        transport.send(message)
         return self._wait_for_id(transport, request_id)
 
     def _wait_for_id(self, transport: JsonRpcTransport, request_id: int) -> JsonObject:
@@ -179,6 +195,30 @@ class CodexAppServerProvider:
         if any(term in lowered for term in ("auth", "login", "credential", "unauthorized")):
             raise UsageAuthenticationError(message)
         raise UsageCommandError(message)
+
+
+class CodexAppServerProvider:
+    """UsageProvider backed by Codex's stable local app-server account API."""
+
+    def __init__(
+        self,
+        transport_factory: Callable[[], JsonRpcTransport] | None = None,
+        *,
+        timeout_seconds: float = 5.0,
+        clock: Callable[[], datetime] | None = None,
+    ) -> None:
+        self._gateway = CodexAppServerGateway(
+            transport_factory,
+            timeout_seconds=timeout_seconds,
+        )
+        self._clock = clock or (lambda: datetime.now(UTC))
+
+    def get_usage(self) -> UsageSnapshot:
+        response = self._gateway.call("account/rateLimits/read")
+        observed_at = self._clock()
+        if observed_at.tzinfo is None or observed_at.utcoffset() is None:
+            raise ValueError("provider clock must return a timezone-aware datetime")
+        return parse_rate_limits_response(response, observed_at=observed_at)
 
 
 def parse_rate_limits_response(message: JsonObject, *, observed_at: datetime) -> UsageSnapshot:

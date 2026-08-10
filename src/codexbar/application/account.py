@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from enum import StrEnum
 from typing import Protocol
 
+from codexbar.application.reset_events import RedeemAttemptId
 from codexbar.domain.models import UsageSnapshot
-from codexbar.domain.reset import ResetCreditReadResult
+from codexbar.domain.reset import ResetCreditId, ResetCreditReadResult
 
 
 @dataclass(frozen=True, slots=True)
@@ -21,10 +23,20 @@ class AccountRateLimitsReader(Protocol):
     def read_account_rate_limits(self) -> AccountRateLimitsObservation: ...
 
 
-class ResetCreditConsumer(Protocol):
-    """Segregated reset-credit side-effect port reserved for Phase D.
+class ResetConsumeOutcome(StrEnum):
+    RESET = "reset"
+    ALREADY_REDEEMED = "alreadyRedeemed"
+    NOTHING_TO_RESET = "nothingToReset"
+    NO_CREDIT = "noCredit"
 
-    TASK-511 establishes the destructive capability as a separate application boundary without
-    prematurely freezing consume command/outcome types. The callable contract is added when those
-    normalized types are introduced by the redeem implementation tasks.
-    """
+
+@dataclass(frozen=True, slots=True)
+class ResetConsumeCommand:
+    attempt_id: RedeemAttemptId
+    credit_id: ResetCreditId | None = None
+
+
+class ResetCreditConsumer(Protocol):
+    """Segregated destructive port for one explicit reset-credit consume operation."""
+
+    def consume_reset_credit(self, command: ResetConsumeCommand) -> ResetConsumeOutcome: ...

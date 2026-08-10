@@ -21,12 +21,14 @@ from typing import Any
 MENU_ACTIONS = (
     ("Refresh", "refresh"),
     ("Open details", "details"),
+    ("History", "history"),
     ("Settings", "settings"),
     ("Quit", "quit"),
 )
 
 _DIAGNOSTIC_PNG = base64.b64decode(
-    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII="
+    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42Y"
+    "AAAAASUVORK5CYII="
 )
 
 
@@ -69,6 +71,7 @@ def _run_diagnostics() -> int:
         f"wayland={bool(os.environ.get('WAYLAND_DISPLAY'))}"
     )
     _emit_diagnostic("environment", True, environment_detail)
+
     try:
         import gi
     except Exception as exc:
@@ -95,6 +98,7 @@ def _run_diagnostics() -> int:
     with tempfile.TemporaryDirectory(prefix="codexbar-indicator-diagnostic-") as tmp:
         icon = Path(tmp) / "codexbar.png"
         icon.write_bytes(_DIAGNOSTIC_PNG)
+
         try:
             indicator = AyatanaAppIndicator3.Indicator.new_with_path(
                 "codexbar-diagnostic",
@@ -124,14 +128,19 @@ def _run_diagnostics() -> int:
         _emit_diagnostic("menu-bind", True)
 
         try:
-            indicator.set_label("5h: 99% · W: 88%", "5h: 100% · W: 100% · stale")
+            indicator.set_label(
+                "5h: 99% · W: 88%",
+                "5h: 100% · W: 100% · stale",
+            )
         except Exception as exc:
             _emit_diagnostic("label-set", False, repr(exc))
             return 15
         _emit_diagnostic("label-set", True)
 
         try:
-            indicator.set_status(AyatanaAppIndicator3.IndicatorStatus.ACTIVE)
+            indicator.set_status(
+                AyatanaAppIndicator3.IndicatorStatus.ACTIVE
+            )
         except Exception as exc:
             _emit_diagnostic("status-active", False, repr(exc))
             return 16
@@ -146,7 +155,10 @@ def _run_diagnostics() -> int:
             return 17
         finally:
             with suppress(Exception):
-                indicator.set_status(AyatanaAppIndicator3.IndicatorStatus.PASSIVE)
+                indicator.set_status(
+                    AyatanaAppIndicator3.IndicatorStatus.PASSIVE
+                )
+
         _emit_diagnostic(
             "glib-loop",
             True,
@@ -174,7 +186,12 @@ def main() -> int:
     try:
         AppIndicator3, GLib, Gtk = _load_bindings()
     except (ImportError, ValueError) as exc:
-        print(json.dumps({"error": "bindings-unavailable", "detail": str(exc)}), flush=True)
+        print(
+            json.dumps(
+                {"error": "bindings-unavailable", "detail": str(exc)}
+            ),
+            flush=True,
+        )
         return 3
 
     indicator = AppIndicator3.Indicator.new_with_path(
@@ -199,6 +216,10 @@ def main() -> int:
     details_item.connect("activate", lambda *_: _emit("details"))
     menu.append(details_item)
 
+    history_item = Gtk.MenuItem(label="History")
+    history_item.connect("activate", lambda *_: _emit("history"))
+    menu.append(history_item)
+
     settings_item = Gtk.MenuItem(label="Settings")
     settings_item.connect("activate", lambda *_: _emit("settings"))
     menu.append(settings_item)
@@ -222,11 +243,17 @@ def main() -> int:
             indicator.set_label(text, guide)
             summary_item.set_label(text)
         elif command == "quit":
-            indicator.set_status(AppIndicator3.IndicatorStatus.PASSIVE)
+            indicator.set_status(
+                AppIndicator3.IndicatorStatus.PASSIVE
+            )
             loop.quit()
         return False
 
-    threading.Thread(target=_reader, args=(GLib, apply_command), daemon=True).start()
+    threading.Thread(
+        target=_reader,
+        args=(GLib, apply_command),
+        daemon=True,
+    ).start()
     _emit("ready")
     loop.run()
     return 0

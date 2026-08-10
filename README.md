@@ -1,49 +1,40 @@
 # CodexBar
 
-CodexBar is a Linux tray application that reads Codex usage/rate-limit information from the locally
-authenticated Codex app-server and presents remaining quota at a glance.
+CodexBar is a Linux tray application that reads Codex usage/rate-limit information from the locally authenticated Codex app-server and presents current and retained observational usage data.
 
 ## Current project status
 
-Current release: **1.3.0**.
+Release candidate: **1.4.0 — Understand**. Latest tagged baseline before release close: **1.3.0**.
 
-Validated on Ubuntu/GNOME/Wayland:
-- `REQ-USAGE-001` — real Codex usage provider: **validated**.
-- `REQ-UI-001` — adaptive Linux tray interaction: **validated**.
-- `REQ-UI-002` — project-owned icon, native Ayatana label and Qt fallback: **validated**.
-- `REQ-DESKTOP-001` — user-local installation, autostart and uninstall: **validated**.
-- `REQ-SETTINGS-001` — persistent settings and runtime application: **validated**.
-- `REQ-ALERT-001` — transition-based LOW/EXHAUSTED desktop alerts: **validated**.
-- `REQ-HISTORY-001` — bounded local normalized usage history: **validated**.
+Validated on Ubuntu/GNOME/Wayland through v1.4:
+- verified current Codex usage and CURRENT/STALE fallback;
+- Linux tray/Ayatana integration and Qt fallback contract;
+- persistent settings and LOW/EXHAUSTED notifications;
+- schema-v1 bounded local history;
+- descriptive historical analytics;
+- History UI with 24h/7d/30d periods and explicit observation-time axis;
+- richer CURRENT details with classification, age, reset metadata and stable current-to-history navigation;
+- GUI composition/lifecycle stabilization.
 
-CodexBar 1.3.0 is the validated **Remember** release: bounded local normalized usage history is now part of the supported product contract.
+Final v1.4 target gate: **353 tests passed**, Ruff PASS, strict mypy PASS, compileall PASS, native indicator diagnostics PASS, mandatory physical checks PASS.
 
 ## Prerequisites
 
-Required:
-- Linux;
-- authenticated local Codex installation;
-- compatible Python version from `pyproject.toml`;
-- `uv`;
-- `notify-send` for desktop alerts.
+Required: Linux, authenticated local Codex, compatible Python from `pyproject.toml`, `uv`, and `notify-send`.
 
 Ubuntu/Debian:
-
 ```bash
 sudo apt update
 sudo apt install libnotify-bin
 ```
 
 Optional native Ayatana menu/label:
-
 ```bash
 sudo apt install python3-gi gir1.2-ayatanaappindicator3-0.1 gir1.2-gtk-3.0
 ```
-
 PyGObject remains outside the uv-managed environment.
 
 ## Install and run
-
 ```bash
 git clone https://github.com/cafvf/codexbar.git
 cd codexbar
@@ -52,68 +43,31 @@ cd codexbar
 "$(uv tool dir --bin)/codexbar" --gui
 ```
 
+## Current details
+Current Details displays each reported window with its current whole-percent presentation, visual remaining indicator, AVAILABLE/LOW/EXHAUSTED state, freshness/observation age, and reset metadata when supplied. `Reset: not reported` means the source did not provide a reset timestamp; CodexBar does not invent one.
+
+Each current card can open History using the same stable `UsageWindowId`. Historical data never substitutes for missing current data.
+
+## Historical insight
+History retains the v1.3 schema-v1 30-day observational store and adds read-only descriptive analysis. The v1.4 History surface exposes **Period** (`24h`, `7d`, `30d`) as its visible selector. When opened from a current card, its stable window identity remains focused internally across period changes.
+
+History shows observation count, first/latest observation, first/latest remaining, observed min/max/change, and discrete points positioned by actual `observed_at` timestamps. Gaps remain gaps: no interpolation, forecasting, ETA or authoritative token-consumption accounting is performed.
+
+History maintenance CLI:
+```bash
+codexbar history inspect
+codexbar history clear
+```
+
 ## Settings and alerts
-
-Open **Settings** from the tray menu to edit:
-- LOW remaining threshold;
-- automatic refresh interval;
-- notifications enabled.
-
-Alert behavior:
-- first observation is a silent baseline;
-- `AVAILABLE -> LOW` alerts;
-- `LOW -> EXHAUSTED` alerts;
-- unchanged LOW/EXHAUSTED states are deduplicated;
-- recovery to AVAILABLE re-arms a later alert;
-- re-enable does not replay a transition that occurred while disabled;
-- stale/error outcomes do not create alert transitions.
-
-CLI settings:
+Settings: LOW threshold, automatic refresh interval, notification enablement. Alerts remain transition-based and ignore STALE/error outcomes.
 
 ```bash
 codexbar settings show
 codexbar settings reset
 ```
 
-## Usage history
-
-The v1.3 implementation stores every eligible `Freshness.CURRENT` normalized snapshot in a local
-schema-v1 SQLite database. STALE fallback data is never inserted as a new historical observation.
-
-Default history location:
-
-```text
-$XDG_DATA_HOME/codexbar/history.sqlite3
-```
-
-with host-user fallback:
-
-```text
-$HOME/.local/share/codexbar/history.sqlite3
-```
-
-Snap-scoped XDG data paths are rejected in favor of the host-user fallback.
-
-History policy:
-- fixed 30-day retention;
-- observations strictly older than `now_utc - 30 days` are pruned;
-- the exact cutoff observation is retained;
-- history is discrete observation data, not continuous token accounting;
-- history failures are isolated from successful current usage and alerts;
-- raw provider payloads, account identifiers and credentials are not persisted.
-
-Inspection and maintenance:
-
-```bash
-codexbar history inspect
-codexbar history clear
-```
-
-`history clear` is destructive for stored observations but preserves the valid database schema. It is
-idempotent, does not modify settings, and is not used as implicit recovery for corrupt/unsupported storage.
-
 ## Development and release checks
-
 ```bash
 uv sync --extra dev --extra gui --extra native-indicator
 uv run pytest -ra
@@ -122,49 +76,23 @@ uv run mypy
 uv run python -m compileall -q src scripts
 ```
 
-Notification diagnostics:
-
+v1.4 target validation:
 ```bash
-uv run python scripts/diagnose_notifications.py
-```
-
-History validation:
-
-```bash
-uv run python scripts/validate_history.py all
+uv run python scripts/validate_v1_4.py
 ```
 
 ## Documentation map
-
-- `CHANGELOG.md` — release history.
-- `CONSTITUTION.md` — engineering rules and invariants.
 - `PRODUCT_SPEC.md` — product baseline and release evolution.
-- `docs/specs/v1.3/` — v1.3 history requirement and release gates.
-- `docs/TRACEABILITY-REQ-HISTORY-001.md` — detailed v1.3 traceability.
-- `docs/VALIDATION-REQ-HISTORY-001.md` — v1.3 target validation.
-- `docs/adr/ADR-007-history-persistence.md` — SQLite/XDG persistence decision and as-built architecture.
-- `docs/INSTALLATION.md` — installation, history data and troubleshooting.
-- `docs/GIT_WORKFLOW.md` — repository workflow and release gates.
-- `docs/RELEASE-CHECKLIST-v1.3.0.md` — final v1.3.0 release-close checklist.
+- `CHANGELOG.md` — release history.
+- `docs/specs/v1.4/` — v1.4 requirements/tasks/release contract.
+- `docs/TRACEABILITY-v1.4.md` — v1.4 release traceability index.
+- `docs/TRACEABILITY-REQ-ANALYTICS-001.md` — analytics closure.
+- `docs/TRACEABILITY-REQ-HISTORY-UI-001.md` — History UI closure.
+- `docs/TRACEABILITY-REQ-UI-003.md` — richer current UI closure.
+- `docs/TRACEABILITY-REQ-UI-LIFECYCLE-001.md` — GUI lifecycle closure.
+- `docs/VALIDATION-v1.4.0.md` — final target-system evidence.
+- `docs/RELEASE-CHECKLIST-v1.4.0.md` — final local gate/tag procedure.
+- `docs/FUTURE-TASKS.md` — explicitly deferred maintenance warnings/tasks.
 
-Earlier release-specific traceability and validation records remain authoritative for v1.0-v1.2.
-
-## Security boundary
-
-CodexBar does not manage Codex credentials. Notification events and history persistence consume normalized
-domain data only; raw provider payloads, account identifiers and credentials do not cross those boundaries.
-
-## Roadmap
-
-v1.3 is a data-foundation release: **Remember**.
-
-Explicitly deferred beyond v1.3:
-- usage-rate analytics and trend summaries;
-- prediction/forecasting;
-- historical charts/dashboard;
-- richer visualization of current state;
-- cloud/remote history;
-- account-level analytics.
-
-The next product design phase should use the v1.3 history read model rather than redefining observation
-semantics.
+## Security and semantic boundary
+CodexBar does not manage Codex credentials. Raw provider payloads and credentials do not cross history, notification or native-helper boundaries. History is observational and is never a fallback source for CURRENT usage.

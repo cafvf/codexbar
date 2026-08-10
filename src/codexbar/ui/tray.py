@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import sys
+import traceback
 from datetime import datetime
 from typing import cast
 
@@ -167,6 +168,8 @@ class TrayShell:
         settings: AppSettings,
         repository: SettingsRepository,
         notifier: NotificationPort,
+        *,
+        panel: UsagePanel | None = None,
     ) -> None:
         self._app = app
         self._settings = settings
@@ -178,8 +181,9 @@ class TrayShell:
         )
         self._settings_actions = SettingsActions(repository, self.apply_settings)
         self._settings_dialog: SettingsDialog | None = None
+        self._last_rendered_state: TrayViewState | None = None
 
-        self._panel = UsagePanel()
+        self._panel = panel or UsagePanel()
         self._panel.refresh_button.clicked.connect(self.refresh)
         self._panel.quit_button.clicked.connect(app.quit)
 
@@ -238,6 +242,13 @@ class TrayShell:
         apply_refresh_interval(self._refresh_timer, settings)
 
     def show_settings(self) -> None:
+        dialog = self._settings_dialog
+        if dialog is not None:
+            dialog.show()
+            dialog.raise_()
+            dialog.activateWindow()
+            return
+
         dialog = SettingsDialog(self._settings, self._settings_actions, self._panel)
         self._settings_dialog = dialog
         dialog.finished.connect(self._settings_dialog_finished)
@@ -260,18 +271,34 @@ class TrayShell:
 
     def refresh(self) -> None:
         if self._controller.start_refresh():
-            self._panel.render_state(self._controller.state)
+            self._apply_state(self._controller.state)
 
     def _poll(self) -> None:
-        state = self._controller.poll()
-        self._panel.render_state(state)
-        summary = self._menu_summary(state)
+        previous = self._controller.state
+        try:
+            state = self._controller.poll()
+        except Exception as exc:  # keep unexpected worker failures inside the GUI boundary
+            traceback.print_exc()
+            self._apply_state(
+                TrayViewState(
+                    phase=TrayPhase.ERROR,
+                    usage=previous.usage,
+                    message=f"Unexpected refresh failure: {exc}",
+                )
+            )
+            return
 
-        if self._native_indicator is not None and not self._native_indicator.is_healthy():
-            self._native_indicator.close()
-            self._native_indicator = None
-            self._native_event_timer.stop()
-            self._activate_qt_fallback()
+        self._supervise_native_indicator()
+        if state != previous:
+            self._apply_state(state)
+            self._on_controller_transition(previous, state)
+
+    def _apply_state(self, state: TrayViewState) -> None:
+        if state == self._last_rendered_state:
+            return
+        self._last_rendered_state = state
+        self._panel.render_state(state)
+        self._summary_action.setText(self._menu_summary(state))
 
         if self._native_indicator is not None:
             self._native_indicator.set_glance(
@@ -280,7 +307,22 @@ class TrayShell:
             )
         elif self._tray is not None:
             self._tray.setToolTip(self._tooltip(state))
-        self._summary_action.setText(summary)
+
+    def _on_controller_transition(
+        self,
+        _previous: TrayViewState,
+        _current: TrayViewState,
+    ) -> None:
+        """Lifecycle hook for composed shells; current TrayController remains history-free."""
+
+    def _supervise_native_indicator(self) -> None:
+        indicator = self._native_indicator
+        if indicator is None or indicator.is_healthy():
+            return
+        indicator.close()
+        self._native_indicator = None
+        self._native_event_timer.stop()
+        self._activate_qt_fallback()
 
     def _ensure_qt_tray(self) -> None:
         if self._tray is not None:
@@ -328,6 +370,9 @@ class TrayShell:
         return summary
 
     def _close(self) -> None:
+        self._poll_timer.stop()
+        self._refresh_timer.stop()
+        self._native_event_timer.stop()
         self._controller.close()
         if self._native_indicator is not None:
             self._native_indicator.close()

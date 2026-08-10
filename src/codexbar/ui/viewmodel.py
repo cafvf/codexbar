@@ -8,12 +8,14 @@ from codexbar.domain.models import (
     UsagePolicy,
     UsageSnapshot,
     UsageWindow,
+    UsageWindowId,
     UsageWindowState,
 )
 
 
 @dataclass(frozen=True, slots=True)
 class UsageWindowViewState:
+    window_id: UsageWindowId
     label: str
     short_label: str
     percent_left: int
@@ -38,6 +40,7 @@ class UsageViewModel:
     ) -> UsageViewState:
         windows = tuple(
             UsageWindowViewState(
+                window_id=window.id,
                 label=window.label,
                 short_label=_short_window_label(window),
                 percent_left=int(window.remaining.percent),
@@ -80,4 +83,7 @@ def _short_window_label(window: UsageWindow) -> str:
 
 
 def _format_glance_text(windows: tuple[UsageWindowViewState, ...]) -> str:
-    return " · ".join(f"{window.short_label}: {window.percent_left}%" for window in windows)
+    return " · ".join(
+        f"{window.short_label}: {window.percent_left}%"
+        for window in windows
+    )

@@ -295,13 +295,26 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.gui:
         try:
+            from codexbar.application.analytics import (
+                HistoricalAnalysisService,
+            )
+            from codexbar.infrastructure.history_sqlite import (
+                open_history_analytics_repository,
+            )
             from codexbar.infrastructure.notifications import NotifySendNotificationAdapter
+            from codexbar.ui.history_controller import HistoryController
             from codexbar.ui.launcher import run_tray
 
+            history_controller = HistoryController(
+                HistoricalAnalysisService(
+                    open_history_analytics_repository(history_database_path())
+                )
+            )
             return run_tray(
                 provider,
                 repository=JsonSettingsRepository(),
                 notifier=NotifySendNotificationAdapter(),
+                history_controller=history_controller,
             )
         except CodexBarError as exc:
             print(f"CodexBar: {exc}", file=sys.stderr)

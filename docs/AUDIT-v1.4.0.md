@@ -1,0 +1,61 @@
+# CodexBar v1.4.0 — Requirement/criterion audit
+
+Status: release-candidate audit complete
+
+This inventory is generated from the normative v1.4 requirement files after the final specification refinements. It prevents release close from relying only on shorthand AC ranges.
+
+## REQ-ANALYTICS-001
+
+- Acceptance criteria discovered: **41**
+- Architectural invariants discovered: **9**
+
+Acceptance criteria:
+
+`AC-ANALYTICS-001`, `AC-ANALYTICS-002`, `AC-ANALYTICS-003`, `AC-ANALYTICS-004`, `AC-ANALYTICS-005`, `AC-ANALYTICS-006`, `AC-ANALYTICS-007`, `AC-ANALYTICS-008`, `AC-ANALYTICS-009`, `AC-ANALYTICS-010`, `AC-ANALYTICS-011`, `AC-ANALYTICS-012`, `AC-ANALYTICS-013`, `AC-ANALYTICS-014`, `AC-ANALYTICS-015`, `AC-ANALYTICS-016`, `AC-ANALYTICS-017`, `AC-ANALYTICS-018`, `AC-ANALYTICS-019`, `AC-ANALYTICS-020`, `AC-ANALYTICS-021`, `AC-ANALYTICS-022`, `AC-ANALYTICS-023`, `AC-ANALYTICS-024`, `AC-ANALYTICS-025`, `AC-ANALYTICS-026`, `AC-ANALYTICS-026A`, `AC-ANALYTICS-027`, `AC-ANALYTICS-028`, `AC-ANALYTICS-029`, `AC-ANALYTICS-030`, `AC-ANALYTICS-031`, `AC-ANALYTICS-032`, `AC-ANALYTICS-033`, `AC-ANALYTICS-034`, `AC-ANALYTICS-035`, `AC-ANALYTICS-036`, `AC-ANALYTICS-037`, `AC-ANALYTICS-038`, `AC-ANALYTICS-039`, `AC-ANALYTICS-040`
+
+Architectural invariants:
+
+`INV-ANALYTICS-001`, `INV-ANALYTICS-002`, `INV-ANALYTICS-003`, `INV-ANALYTICS-004`, `INV-ANALYTICS-005`, `INV-ANALYTICS-006`, `INV-ANALYTICS-007`, `INV-ANALYTICS-008`, `INV-ANALYTICS-009`
+
+## REQ-HISTORY-UI-001
+
+- Acceptance criteria discovered: **46**
+- Architectural invariants discovered: **7**
+
+Acceptance criteria:
+
+`AC-HISTORY-UI-001`, `AC-HISTORY-UI-002`, `AC-HISTORY-UI-003`, `AC-HISTORY-UI-004`, `AC-HISTORY-UI-005`, `AC-HISTORY-UI-006`, `AC-HISTORY-UI-006A`, `AC-HISTORY-UI-006B`, `AC-HISTORY-UI-007`, `AC-HISTORY-UI-008`, `AC-HISTORY-UI-009`, `AC-HISTORY-UI-010`, `AC-HISTORY-UI-011`, `AC-HISTORY-UI-012`, `AC-HISTORY-UI-013`, `AC-HISTORY-UI-014`, `AC-HISTORY-UI-015`, `AC-HISTORY-UI-015A`, `AC-HISTORY-UI-015B`, `AC-HISTORY-UI-016`, `AC-HISTORY-UI-017`, `AC-HISTORY-UI-018`, `AC-HISTORY-UI-019`, `AC-HISTORY-UI-020`, `AC-HISTORY-UI-021`, `AC-HISTORY-UI-022`, `AC-HISTORY-UI-023`, `AC-HISTORY-UI-024`, `AC-HISTORY-UI-025`, `AC-HISTORY-UI-026`, `AC-HISTORY-UI-027`, `AC-HISTORY-UI-028`, `AC-HISTORY-UI-029`, `AC-HISTORY-UI-030`, `AC-HISTORY-UI-031`, `AC-HISTORY-UI-032`, `AC-HISTORY-UI-033`, `AC-HISTORY-UI-034`, `AC-HISTORY-UI-035`, `AC-HISTORY-UI-036`, `AC-HISTORY-UI-037`, `AC-HISTORY-UI-038`, `AC-HISTORY-UI-039`, `AC-HISTORY-UI-040`, `AC-HISTORY-UI-041`, `AC-HISTORY-UI-042`
+
+Architectural invariants:
+
+`INV-HISTORY-UI-001`, `INV-HISTORY-UI-002`, `INV-HISTORY-UI-003`, `INV-HISTORY-UI-004`, `INV-HISTORY-UI-005`, `INV-HISTORY-UI-006`, `INV-HISTORY-UI-007`
+
+## REQ-UI-003
+
+- Acceptance criteria discovered: **33**
+- Architectural invariants discovered: **11**
+
+Acceptance criteria:
+
+`AC-UI-034`, `AC-UI-035`, `AC-UI-036`, `AC-UI-037`, `AC-UI-038`, `AC-UI-039`, `AC-UI-040`, `AC-UI-040A`, `AC-UI-041`, `AC-UI-042`, `AC-UI-043`, `AC-UI-044`, `AC-UI-045`, `AC-UI-046`, `AC-UI-047`, `AC-UI-048`, `AC-UI-049`, `AC-UI-050`, `AC-UI-051`, `AC-UI-052`, `AC-UI-053`, `AC-UI-054`, `AC-UI-054A`, `AC-UI-055`, `AC-UI-056`, `AC-UI-057`, `AC-UI-058`, `AC-UI-059`, `AC-UI-060`, `AC-UI-061`, `AC-UI-062`, `AC-UI-063`, `AC-UI-064`
+
+Architectural invariants:
+
+`INV-UI-003-001`, `INV-UI-003-002`, `INV-UI-003-003`, `INV-UI-003-004`, `INV-UI-003-005`, `INV-UI-003-006`, `INV-UI-003-007`, `INV-UI-003-008`, `INV-UI-003-009`, `INV-UI-003-010`, `INV-UI-003-011`
+
+## REQ-UI-LIFECYCLE-001
+
+- Acceptance criteria discovered: **10**
+- Architectural invariants discovered: **0**
+
+Acceptance criteria:
+
+`AC-LIFECYCLE-001`, `AC-LIFECYCLE-002`, `AC-LIFECYCLE-003`, `AC-LIFECYCLE-004`, `AC-LIFECYCLE-005`, `AC-LIFECYCLE-006`, `AC-LIFECYCLE-007`, `AC-LIFECYCLE-008`, `AC-LIFECYCLE-009`, `AC-LIFECYCLE-010`
+
+## Audit result
+
+- Total explicit acceptance criteria: **130**.
+- Total explicit architectural invariants: **27**.
+- Every scoped v1.4 requirement has a dedicated closure traceability record.
+- TASK-481/481A target evidence is archived in `docs/VALIDATION-v1.4.0.md`.
+- Final metadata/tag hygiene remains governed by `docs/RELEASE-CHECKLIST-v1.4.0.md`.

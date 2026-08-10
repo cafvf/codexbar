@@ -1,141 +1,51 @@
 # Changelog
 
+## 1.4.0 — 2026-08-10
+
+Validated **Understand** release candidate of CodexBar.
+
+### Added
+- read-only descriptive analytics over v1.3 schema-v1 historical observations;
+- 24h/7d/30d analytical periods with one captured end instant and half-open interval semantics;
+- historical summaries for count, first/latest, observed min/max and observed change;
+- historical observation chart positioned by actual observation timestamps with an explicit period time axis;
+- richer CURRENT cards with visual remaining indicator, AVAILABLE/LOW/EXHAUSTED state, freshness/age and reset presentation;
+- stable CURRENT -> History navigation through `UsageWindowId`;
+- dedicated v1.4 target-validation script and release traceability records;
+- GUI lifecycle stabilization requirement and regression suite.
+
+### Changed
+- History exposes Period as its only visible filter in v1.4; focused window identity is retained internally;
+- a focused identity with no samples now remains that identity and produces EMPTY instead of silently selecting another window;
+- CURRENT details are composed once and rendered on state transitions rather than rebuilt on every poll tick;
+- History is a top-level sibling surface with independent show/hide polling lifecycle;
+- missing reset metadata may be shown explicitly as `Reset: not reported`;
+- release metadata advances to 1.4.0.
+
+### Compatibility and safety
+- history schema remains 1; settings schema remains 1;
+- 30-day retention and CURRENT-only history capture remain unchanged;
+- whole-percent CURRENT presentation remains compatible;
+- analytics and charts do not interpolate, forecast, estimate token use or reconstruct unobserved states;
+- alerts and settings policy remain independent of historical reads;
+- native-helper isolation and Qt fallback contract remain intact.
+
+### Validation
+- final target gate: **353 tests passed**;
+- Ruff, strict mypy and compileall passed;
+- `history inspect` remained `ready_non_empty`, schema 1;
+- native indicator diagnostic API path passed;
+- mandatory physical checks passed on Ubuntu/GNOME/Wayland, including CURRENT -> History, History period switching and CURRENT refresh with History hidden/visible;
+- Qt fallback physical re-run was conditionally skipped while automated compatibility remained covered.
+
+### Deferred maintenance
+- Ayatana deprecation warning tracked as `FUTURE-001`;
+- `canberra-gtk-module` warning tracked as `FUTURE-002`.
+
+See `docs/specs/v1.4/RELEASE.md`, `docs/TRACEABILITY-v1.4.md`, `docs/VALIDATION-v1.4.0.md` and `docs/RELEASE-CHECKLIST-v1.4.0.md`.
+
 ## 1.3.0 — 2026-08-09
 
-Validated local-history release of CodexBar.
+Validated **Remember** release: schema-v1 SQLite history for normalized CURRENT observations, fixed 30-day retention, history inspect/clear, failure isolation and discrete-observation semantics.
 
-### Added
-- schema-v1 SQLite history for normalized CURRENT usage snapshots and child window observations;
-- canonical host-user XDG history path with Snap-scoped path protection;
-- deterministic observation identity/idempotency;
-- half-open `[start, end)` snapshot and stable-window queries;
-- fixed 30-day history retention with exact cutoff semantics and child-row cascade;
-- history inspection states for absent, ready-empty, ready-non-empty, unreadable and unsupported storage;
-- `codexbar history inspect`;
-- explicit destructive `codexbar history clear` that preserves valid schema;
-- `HistoryRepository`, historical value/read models and normalized history error taxonomy;
-- `HistoryService` and `HistoryCapturingUsageProvider` for failure-isolated runtime capture;
-- `scripts/validate_history.py` and requirement-specific target validation record;
-- history architecture/regression guards for `INV-HISTORY-001..008`.
-
-### Changed
-- normal CLI and tray provider composition now includes local history capture;
-- history append/prune executes in the existing refresh worker path instead of the GUI polling path;
-- every successful CURRENT observation is eligible for persistence;
-- pruning runs in the same history maintenance cycle; no second scheduler/cadence is introduced;
-- application startup degrades gracefully if history storage cannot be initialized;
-- release gates include `scripts` for Ruff and compileall.
-
-### Compatibility and safety
-- settings schema remains version 1 and gains no history fields;
-- v1.0 CURRENT/STALE semantics remain unchanged;
-- v1.2 alert transition/deduplication semantics remain unchanged;
-- STALE and provider-error fallback paths do not create new historical observations;
-- history storage failure does not fabricate source failure, stale state or suppress alert evaluation;
-- history clear does not reset current in-memory usage or alert deduplication state;
-- corrupt/unsupported history fails closed and is not silently deleted/recreated;
-- raw provider payloads, credentials and account identifiers are not persisted;
-- history is observation data only and does not imply continuous measurement or token accounting.
-
-### Validation
-- repository-wide pytest, Ruff, strict mypy and compileall gates passed;
-- exact retention boundary, query boundaries, restart persistence, clear and corruption handling are covered;
-- Ubuntu/GNOME/Wayland validation confirmed canonical XDG storage, persistence across processes, CLI clear,
-  controlled failure isolation and responsive tray operation with history enabled.
-
-See `docs/specs/v1.3/RELEASE.md`, `docs/TRACEABILITY-REQ-HISTORY-001.md`,
-`docs/VALIDATION-REQ-HISTORY-001.md` and `docs/adr/ADR-007-history-persistence.md`.
-
-
-## 1.2.0 — 2026-08-09
-
-Validated alerting release of CodexBar.
-
-### Added
-- transition-based desktop notifications for LOW and EXHAUSTED Codex usage states;
-- per-window runtime transition tracking with silent startup/restart baselines;
-- deduplication of repeated unchanged constrained states;
-- re-arm after recovery to AVAILABLE;
-- live respect for the persisted `notifications_enabled` setting without replay on re-enable;
-- `NotificationPort` boundary and normalized `NotificationDeliveryError`;
-- Linux desktop notification delivery through distro-native `notify-send` / `libnotify-bin`;
-- controlled alert-validation and notification-diagnostic scripts.
-
-### Changed
-- the v1.1 `notifications_enabled` preference now controls real desktop notification delivery;
-- alert classification reuses the configured `UsagePolicy` and existing LOW threshold;
-- notification transport decision was revised from direct PySide6 QtDBus to `notify-send` after physical
-  target validation exposed D-Bus marshalling incompatibilities in the Python binding;
-- development/release checks now include the `scripts` directory where applicable;
-- release metadata advances from 1.1.0 to 1.2.0.
-
-### Compatibility and safety
-- settings schema remains version 1;
-- no persisted alert/deduplication state is introduced;
-- stale snapshots and provider failures do not fabricate alert transitions;
-- notification-delivery failure does not invalidate a successful usage refresh or stop later refreshes;
-- raw provider payloads and credentials do not cross the notification boundary;
-- v1.0/v1.1 provider, tray, settings and desktop contracts remain in force.
-
-### Validation
-- acceptance, unit, architecture and regression suites passed;
-- repository-wide pytest, ruff, strict mypy and compileall gates passed during implementation;
-- `notify-send` diagnostics returned success and a positive notification id on Ubuntu/GNOME/Wayland;
-- LOW and EXHAUSTED notifications were visibly presented and distinguishable on the target workstation.
-
-See `docs/specs/v1.2/RELEASE.md`, `docs/TRACEABILITY-REQ-ALERT-001.md`,
-`docs/VALIDATION-REQ-ALERT-001.md` and `docs/adr/ADR-006-linux-notifications.md`.
-
-## 1.1.0 — 2026-08-08
-
-Validated settings release of CodexBar.
-
-### Added
-- persistent schema-v1 user settings under the canonical XDG configuration directory;
-- configurable LOW remaining-usage threshold;
-- configurable automatic refresh interval with validated range `10..3600` seconds;
-- persisted `notifications_enabled` preference for future alert behavior;
-- `codexbar settings show` and `codexbar settings reset`;
-- Qt Settings dialog with Save, Cancel, Reset and validation feedback;
-- Settings action in both the Qt tray menu and the native Ayatana helper menu;
-- typed corruption/schema diagnostics and deterministic fallback to defaults.
-
-### Changed
-- runtime usage classification now consumes the persisted LOW threshold through the existing
-  `UsagePolicy`;
-- automatic refresh cadence can change without restarting CodexBar and retains the existing
-  no-overlapping-refresh guard;
-- settings writes use versioned JSON and atomic replacement semantics;
-- release metadata is advanced from 1.0.0 to 1.1.0.
-
-### Compatibility and safety
-- v1.0 provider, domain, tray, desktop-installation and failure-safety contracts remain in force;
-- malformed or unsupported settings documents do not prevent application startup;
-- reading a corrupt settings document does not silently overwrite it;
-- Snap-scoped configuration paths fall back to the canonical host-user configuration location;
-- notification delivery remains deferred to `REQ-ALERT-001`.
-
-### Validation
-- `REQ-SETTINGS-001` acceptance, unit, architecture and GUI tests passed during implementation;
-- repository-wide pytest, ruff, strict mypy and compileall gates passed at the implementation gate;
-- the settings lifecycle was validated on the target Ubuntu/GNOME/Wayland workstation;
-- target validation discovered and closed a native Ayatana menu-parity defect before release.
-
-See `docs/specs/v1.1/RELEASE.md`, `docs/TRACEABILITY-REQ-SETTINGS-001.md` and
-`docs/VALIDATION-REQ-SETTINGS-001.md`.
-
-## 1.0.0 — 2026-08-08
-
-First validated release of CodexBar.
-
-### Included
-- authenticated Codex usage/rate-limit retrieval through the local Codex app-server;
-- normalized dynamic usage windows with stale/error semantics;
-- Linux tray UI with project-owned icon, refresh/detail/quit interaction and Qt fallback;
-- optional Ayatana native indicator label through an isolated system-Python helper;
-- supervision, diagnostics and Snap/IDE runtime-environment sanitization for the native helper;
-- canonical user-local `uv tool` installation with XDG desktop entry and icon;
-- opt-in, reversible autostart;
-- managed uninstall and checkout-independent installed execution;
-- protection against Snap-scoped XDG installation paths;
-- repository-wide pytest, ruff, strict mypy and compileall release gates.
+Earlier release records remain authoritative in their release-specific documentation.

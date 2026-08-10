@@ -9,11 +9,17 @@ from codexbar.ui import native_indicator
 from codexbar.ui.native_indicator_helper import MENU_ACTIONS
 
 
-def test_helper_indicator_registers_settings_callback(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_helper_indicator_registers_settings_callback(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     stdin = io.StringIO()
     process = Mock(stdin=stdin, stdout=io.StringIO(), stderr=io.StringIO())
     process.poll.return_value = None
-    monkeypatch.setattr(native_indicator.subprocess, "Popen", Mock(return_value=process))
+    monkeypatch.setattr(
+        native_indicator.subprocess,
+        "Popen",
+        Mock(return_value=process),
+    )
     monkeypatch.setattr(
         native_indicator.AyatanaHelperIndicator,
         "_await_ready",
@@ -36,11 +42,13 @@ def test_helper_indicator_registers_settings_callback(monkeypatch: pytest.Monkey
     indicator.close()
 
 
-def test_native_helper_menu_contract_includes_settings() -> None:
+def test_native_helper_menu_contract_includes_settings_and_history() -> None:
     assert ("Settings", "settings") in MENU_ACTIONS
+    assert ("History", "history") in MENU_ACTIONS
     assert MENU_ACTIONS == (
         ("Refresh", "refresh"),
         ("Open details", "details"),
+        ("History", "history"),
         ("Settings", "settings"),
         ("Quit", "quit"),
     )

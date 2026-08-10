@@ -7,6 +7,11 @@ from datetime import UTC, datetime
 from decimal import Decimal
 from pathlib import Path
 
+from codexbar.application.analytics import (
+    AbsentHistoryAnalyticsRepository,
+    FailedHistoryAnalyticsRepository,
+    HistoryAnalyticsRepository,
+)
 from codexbar.application.history import (
     HistoricalSnapshot,
     HistoricalWindowObservation,
@@ -392,6 +397,36 @@ class SqliteHistoryRepository(HistoryRepository):
                 ) from exc
             raise HistoryReadError(f"cannot query window history: {exc}") from exc
 
+    def list_window_ids(
+        self,
+        interval: HistoryInterval,
+    ) -> tuple[UsageWindowId, ...]:
+        """Return distinct stable window identities observed inside an interval."""
+        try:
+            with self._connect() as connection:
+                rows = connection.execute(
+                    """
+                    SELECT DISTINCT w.window_id
+                    FROM window_observations AS w
+                    JOIN snapshots AS s ON s.id = w.snapshot_id
+                    WHERE
+                        s.observed_at_utc >= ?
+                        AND s.observed_at_utc < ?
+                    ORDER BY w.window_id ASC
+                    """,
+                    (
+                        _format_timestamp(interval.start),
+                        _format_timestamp(interval.end),
+                    ),
+                ).fetchall()
+                return tuple(UsageWindowId(row[0]) for row in rows)
+        except (ValueError, sqlite3.DatabaseError) as exc:
+            if isinstance(exc, sqlite3.DatabaseError) and _is_corruption_error(exc):
+                raise HistoryCorruptionError(
+                    f"history database is corrupt during window discovery: {exc}"
+                ) from exc
+            raise HistoryReadError(f"cannot discover history windows: {exc}") from exc
+
     def prune(self, cutoff: datetime) -> int:
         try:
             encoded_cutoff = _format_timestamp(cutoff)
@@ -463,7 +498,9 @@ class SqliteHistoryRepository(HistoryRepository):
                     """
                 ).fetchone()
                 if aggregate is None:
-                    raise sqlite3.DatabaseError("history inspection returned no aggregate row")
+                    raise sqlite3.DatabaseError(
+                        "history inspection returned no aggregate row"
+                    )
 
                 count, oldest, newest = aggregate
                 state = (
@@ -502,3 +539,15 @@ class SqliteHistoryRepository(HistoryRepository):
                     f"history database is corrupt during clear: {exc}"
                 ) from exc
             raise HistoryWriteError(f"cannot clear history: {exc}") from exc
+
+
+def open_history_analytics_repository(
+    path: Path,
+) -> HistoryAnalyticsRepository:
+    """Open history for analytics without creating or repairing persistent storage."""
+    if not path.exists():
+        return AbsentHistoryAnalyticsRepository()
+    try:
+        return SqliteHistoryRepository(path)
+    except (HistorySchemaError, HistoryCorruptionError, HistoryReadError) as exc:
+        return FailedHistoryAnalyticsRepository(exc)

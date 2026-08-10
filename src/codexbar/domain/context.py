@@ -1,0 +1,242 @@
+from __future__ import annotations
+
+from collections.abc import Iterable
+from dataclasses import dataclass
+from datetime import UTC, datetime, timedelta
+from enum import StrEnum
+
+from codexbar.domain.models import Fraction, UsageWindowId
+
+_CONTEXT_TOLERANCE_DIVISOR = 20  # alpha = 0.05 exactly
+_CONTEXT_TOLERANCE_CAP = timedelta(hours=2)
+
+
+def _require_aware(value: datetime, field_name: str) -> datetime:
+    if value.tzinfo is None or value.utcoffset() is None:
+        raise ValueError(f"{field_name} must be timezone-aware")
+    return value.astimezone(UTC)
+
+
+@dataclass(frozen=True, slots=True, order=True)
+class TimeToReset:
+    """Non-negative time remaining until an authoritative reset instant."""
+
+    duration: timedelta
+
+    def __post_init__(self) -> None:
+        if self.duration < timedelta(0):
+            raise ValueError("time to reset must not be negative")
+
+    @classmethod
+    def from_instants(cls, *, observed_at: datetime, resets_at: datetime) -> TimeToReset:
+        observed_utc = _require_aware(observed_at, "observed_at")
+        reset_utc = _require_aware(resets_at, "resets_at")
+        return cls(reset_utc - observed_utc)
+
+
+@dataclass(frozen=True, slots=True)
+class CycleIdentity:
+    """Authoritative contextual cycle identity."""
+
+    window_id: UsageWindowId
+    resets_at: datetime
+
+    def __post_init__(self) -> None:
+        object.__setattr__(
+            self,
+            "resets_at",
+            _require_aware(self.resets_at, "resets_at"),
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class ContextObservation:
+    """One real retained observation eligible for contextual evaluation."""
+
+    window_id: UsageWindowId
+    observed_at: datetime
+    remaining: Fraction
+    resets_at: datetime | None
+
+    def __post_init__(self) -> None:
+        object.__setattr__(
+            self,
+            "observed_at",
+            _require_aware(self.observed_at, "observed_at"),
+        )
+        if self.resets_at is not None:
+            object.__setattr__(
+                self,
+                "resets_at",
+                _require_aware(self.resets_at, "resets_at"),
+            )
+
+
+@dataclass(frozen=True, slots=True)
+class ComparableCycleObservation:
+    """The single selected real observation contributed by one historical cycle."""
+
+    cycle: CycleIdentity
+    observed_at: datetime
+    remaining: Fraction
+    time_to_reset: TimeToReset
+
+    def __post_init__(self) -> None:
+        object.__setattr__(
+            self,
+            "observed_at",
+            _require_aware(self.observed_at, "observed_at"),
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class ContextReferenceSet:
+    """Independent-cycle historical references at one current time-to-reset coordinate."""
+
+    current_cycle: CycleIdentity
+    current_time_to_reset: TimeToReset
+    observations: tuple[ComparableCycleObservation, ...]
+
+    def __post_init__(self) -> None:
+        identities = [observation.cycle for observation in self.observations]
+        if len(identities) != len(set(identities)):
+            raise ValueError("context reference set must contain at most one observation per cycle")
+        if self.current_cycle in identities:
+            raise ValueError("current cycle must not appear in context reference set")
+
+    @property
+    def cycle_count(self) -> int:
+        return len(self.observations)
+
+
+class ContextSelectionState(StrEnum):
+    READY = "ready"
+    CURRENT_RESET_MISSING = "current_reset_missing"
+    CURRENT_RESET_INVALID = "current_reset_invalid"
+    NO_HISTORICAL_OBSERVATIONS = "no_historical_observations"
+    NO_IDENTIFIABLE_CYCLES = "no_identifiable_cycles"
+    NO_COMPARABLE_CYCLES = "no_comparable_cycles"
+
+
+@dataclass(frozen=True, slots=True)
+class ContextReferenceSelection:
+    """Explicit result of pure domain reference selection."""
+
+    state: ContextSelectionState
+    reference_set: ContextReferenceSet | None = None
+
+    def __post_init__(self) -> None:
+        if self.state is ContextSelectionState.READY and self.reference_set is None:
+            raise ValueError("ready context selection requires a reference set")
+        if self.state is not ContextSelectionState.READY and self.reference_set is not None:
+            raise ValueError("non-ready context selection must not contain a reference set")
+
+
+def contextual_tolerance(current: TimeToReset) -> timedelta:
+    """Return min(0.05*h*, 2 hours) using exact integer scaling."""
+
+    return min(current.duration / _CONTEXT_TOLERANCE_DIVISOR, _CONTEXT_TOLERANCE_CAP)
+
+
+def select_context_references(
+    *,
+    current: ContextObservation,
+    historical: Iterable[ContextObservation],
+) -> ContextReferenceSelection:
+    """Select at most one nearest real observation from each eligible historical cycle."""
+
+    if current.resets_at is None:
+        return ContextReferenceSelection(ContextSelectionState.CURRENT_RESET_MISSING)
+
+    try:
+        current_time = TimeToReset.from_instants(
+            observed_at=current.observed_at,
+            resets_at=current.resets_at,
+        )
+    except ValueError:
+        return ContextReferenceSelection(ContextSelectionState.CURRENT_RESET_INVALID)
+
+    current_cycle = CycleIdentity(current.window_id, current.resets_at)
+    history = tuple(historical)
+    if not history:
+        return ContextReferenceSelection(ContextSelectionState.NO_HISTORICAL_OBSERVATIONS)
+
+    grouped: dict[CycleIdentity, list[ComparableCycleObservation]] = {}
+    identifiable_cycle_seen = False
+
+    for observation in history:
+        if observation.window_id != current.window_id:
+            continue
+        if observation.observed_at > current.observed_at:
+            continue
+        if observation.resets_at is None:
+            continue
+
+        try:
+            time_to_reset = TimeToReset.from_instants(
+                observed_at=observation.observed_at,
+                resets_at=observation.resets_at,
+            )
+        except ValueError:
+            continue
+
+        cycle = CycleIdentity(observation.window_id, observation.resets_at)
+        identifiable_cycle_seen = True
+        if cycle == current_cycle:
+            continue
+
+        grouped.setdefault(cycle, []).append(
+            ComparableCycleObservation(
+                cycle=cycle,
+                observed_at=observation.observed_at,
+                remaining=observation.remaining,
+                time_to_reset=time_to_reset,
+            )
+        )
+
+    if not identifiable_cycle_seen:
+        return ContextReferenceSelection(ContextSelectionState.NO_IDENTIFIABLE_CYCLES)
+    if not grouped:
+        return ContextReferenceSelection(ContextSelectionState.NO_COMPARABLE_CYCLES)
+
+    tolerance = contextual_tolerance(current_time)
+    selected: list[ComparableCycleObservation] = []
+
+    for cycle in sorted(grouped, key=lambda identity: identity.resets_at):
+        nearest = _nearest_observation(grouped[cycle], current_time)
+        mismatch = abs(nearest.time_to_reset.duration - current_time.duration)
+        if mismatch <= tolerance:
+            selected.append(nearest)
+
+    if not selected:
+        return ContextReferenceSelection(ContextSelectionState.NO_COMPARABLE_CYCLES)
+
+    return ContextReferenceSelection(
+        state=ContextSelectionState.READY,
+        reference_set=ContextReferenceSet(
+            current_cycle=current_cycle,
+            current_time_to_reset=current_time,
+            observations=tuple(selected),
+        ),
+    )
+
+
+def _nearest_observation(
+    observations: Iterable[ComparableCycleObservation],
+    current_time: TimeToReset,
+) -> ComparableCycleObservation:
+    iterator = iter(observations)
+    try:
+        best = next(iterator)
+    except StopIteration as exc:
+        raise ValueError("cannot select nearest observation from an empty cycle") from exc
+
+    best_mismatch = abs(best.time_to_reset.duration - current_time.duration)
+    for candidate in iterator:
+        mismatch = abs(candidate.time_to_reset.duration - current_time.duration)
+        if mismatch < best_mismatch or (
+            mismatch == best_mismatch and candidate.observed_at > best.observed_at
+        ):
+            best = candidate
+            best_mismatch = mismatch
+    return best

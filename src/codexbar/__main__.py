@@ -326,6 +326,8 @@ def main(argv: list[str] | None = None) -> int:
                     repository=runtime.settings_repository,
                     notifier=runtime.notifier,
                     history_controller=runtime.history_controller,
+                    presenter=runtime.presenter,
+                    redeem_manager=runtime.redeem_manager,
                 )
             finally:
                 runtime.close()

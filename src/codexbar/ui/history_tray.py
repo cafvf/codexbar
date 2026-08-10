@@ -14,12 +14,10 @@ from codexbar.ui.current_panel import RichUsagePanel
 from codexbar.ui.history_controller import HistoryController
 from codexbar.ui.history_dialog import HistoryDialog
 from codexbar.ui.native_indicator import AyatanaHelperIndicator
-from codexbar.ui.tray import TrayShell
+from codexbar.ui.tray import TrayShell, UsagePanel
 
 
 class HistoricalTrayShell(TrayShell):
-    """Compose current usage and historical navigation without cross-owning their state."""
-
     def __init__(
         self,
         app: QApplication,
@@ -28,17 +26,19 @@ class HistoricalTrayShell(TrayShell):
         repository: SettingsRepository,
         notifier: NotificationPort,
         history_controller: HistoryController,
+        *,
+        panel: UsagePanel | None = None,
     ) -> None:
         self._history_controller = history_controller
         self._history_dialog: HistoryDialog | None = None
-        panel = RichUsagePanel(on_history=self.show_history_for_window)
+        selected_panel = panel or RichUsagePanel(on_history=self.show_history_for_window)
         super().__init__(
             app,
             provider,
             settings,
             repository,
             notifier,
-            panel=panel,
+            panel=selected_panel,
         )
         self._bind_native_history_action()
         self._install_history_menu_action()

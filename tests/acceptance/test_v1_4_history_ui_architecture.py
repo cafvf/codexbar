@@ -28,7 +28,7 @@ def test_historical_ui_has_no_sqlite_implementation_import() -> None:
 
 
 def test_composition_root_owns_history_storage_wiring() -> None:
-    source = Path("src/codexbar/__main__.py").read_text(encoding="utf-8")
+    source = Path("src/codexbar/composition.py").read_text(encoding="utf-8")
     assert "open_history_analytics_repository" in source
     assert "HistoricalAnalysisService" in source
     assert "HistoryController" in source

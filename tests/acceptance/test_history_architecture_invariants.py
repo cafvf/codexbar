@@ -140,6 +140,7 @@ def test_perf_guard_history_storage_is_not_called_from_ui_controller() -> None:
 def test_history_concrete_storage_is_confined_to_composition_and_infrastructure() -> None:
     allowed = {
         Path("src/codexbar/__main__.py"),
+        Path("src/codexbar/composition.py"),
         Path("src/codexbar/infrastructure/history_sqlite.py"),
     }
     for path in Path("src/codexbar").rglob("*.py"):

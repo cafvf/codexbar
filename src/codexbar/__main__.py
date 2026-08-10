@@ -5,18 +5,14 @@ import sys
 from decimal import Decimal
 
 from codexbar.application.history import HistoryError, HistoryState
-from codexbar.application.history_runtime import (
-    HistoryCapturingUsageProvider,
-    HistoryService,
-)
+from codexbar.application.history_runtime import HistoryCapturingUsageProvider, HistoryService
 from codexbar.application.ports import UsageProvider
 from codexbar.application.settings import GetSettings, ResetSettings, SettingsLoadResult
 from codexbar.application.use_cases import GetCurrentUsage
+from codexbar.composition import build_gui_runtime, build_usage_provider
 from codexbar.domain.errors import CodexBarError, SettingsError
-from codexbar.infrastructure.app_server import CodexAppServerProvider
 from codexbar.infrastructure.history_paths import history_database_path
 from codexbar.infrastructure.history_sqlite import SqliteHistoryRepository
-from codexbar.infrastructure.mock_provider import MockUsageProvider
 from codexbar.infrastructure.settings import JsonSettingsRepository
 from codexbar.ui.viewmodel import UsageViewModel
 
@@ -288,38 +284,25 @@ def main(argv: list[str] | None = None) -> int:
     if args.diagnose_indicator:
         return _run_indicator_diagnostics()
 
-    base_provider: UsageProvider = (
-        MockUsageProvider() if args.mock else CodexAppServerProvider()
-    )
-    provider = _with_history(base_provider)
-
     if args.gui:
         try:
-            from codexbar.application.analytics import (
-                HistoricalAnalysisService,
-            )
-            from codexbar.infrastructure.history_sqlite import (
-                open_history_analytics_repository,
-            )
-            from codexbar.infrastructure.notifications import NotifySendNotificationAdapter
-            from codexbar.ui.history_controller import HistoryController
             from codexbar.ui.launcher import run_tray
 
-            history_controller = HistoryController(
-                HistoricalAnalysisService(
-                    open_history_analytics_repository(history_database_path())
+            runtime = build_gui_runtime(mock=args.mock)
+            try:
+                return run_tray(
+                    runtime.provider,
+                    repository=runtime.settings_repository,
+                    notifier=runtime.notifier,
+                    history_controller=runtime.history_controller,
                 )
-            )
-            return run_tray(
-                provider,
-                repository=JsonSettingsRepository(),
-                notifier=NotifySendNotificationAdapter(),
-                history_controller=history_controller,
-            )
+            finally:
+                runtime.close()
         except CodexBarError as exc:
             print(f"CodexBar: {exc}", file=sys.stderr)
             return 2
 
+    provider = _with_history(build_usage_provider(mock=args.mock))
     return _print_usage(provider)
 
 

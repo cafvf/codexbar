@@ -1,6 +1,6 @@
 # CodexBar v1.5.0 Release Checklist
 
-Status: **READY FOR TAG**
+Status: **RELEASED**
 
 ## Repository
 
@@ -46,8 +46,8 @@ Status: **READY FOR TAG**
 
 ## Release
 
-- [ ] commit release closure.
-- [ ] confirm clean working tree.
-- [ ] create tag `v1.5.0`.
-- [ ] push `main`.
-- [ ] push tag `v1.5.0`.
+- [x] commit release closure.
+- [x] confirm clean working tree.
+- [x] create tag `v1.5.0`.
+- [x] push `main`.
+- [x] push tag `v1.5.0`.

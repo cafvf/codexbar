@@ -1,6 +1,6 @@
 # CodexBar v1.5.0 — Control
 
-Status: **VALIDATED — READY FOR TAG**
+Status: **RELEASED**
 
 ## Release theme
 
@@ -57,4 +57,4 @@ See:
 
 ## Release action
 
-Create tag `v1.5.0` only from the final release-closure commit after confirming a clean working tree.
+Release `v1.5.0` was tagged from the validated release-closure commit.

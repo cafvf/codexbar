@@ -1,6 +1,6 @@
 # CodexBar v1.4 Release Specification
 
-Status: validated release candidate — final repository/tag hygiene pending
+Status: validated and released
 Release target: v1.4.0  
 Baseline: v1.3.0  
 Change taxonomy: EVOLUTION  

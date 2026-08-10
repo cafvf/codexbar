@@ -4,7 +4,7 @@ CodexBar is a Linux tray application that reads Codex usage/rate-limit informati
 
 ## Current project status
 
-Release candidate: **1.4.0 — Understand**. Latest tagged baseline before release close: **1.3.0**.
+Current release: **1.4.0 — Understand**.
 
 Validated on Ubuntu/GNOME/Wayland through v1.4:
 - verified current Codex usage and CURRENT/STALE fallback;

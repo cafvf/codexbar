@@ -1,7 +1,7 @@
 # CodexBar Product Specification
 
-Status: v1.4.0 validated release candidate
-Latest tagged baseline before release close: 1.3.0
+Status: v1.4.0 validated release
+Current validated release: 1.4.0
 Theme: Understand
 
 ## Purpose

@@ -1,6 +1,6 @@
 # CodexBar v1.4.0 release checklist
 
-Status: validated release candidate; final local gate/tag pending
+Status: validated; release-close commit/tag ready
 Theme: Understand
 Target validation: PASS on Ubuntu/GNOME/Wayland, 2026-08-10
 

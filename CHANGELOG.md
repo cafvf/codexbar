@@ -2,7 +2,7 @@
 
 ## 1.4.0 — 2026-08-10
 
-Validated **Understand** release candidate of CodexBar.
+Validated **Understand** release of CodexBar.
 
 ### Added
 - read-only descriptive analytics over v1.3 schema-v1 historical observations;

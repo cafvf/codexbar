@@ -7,6 +7,7 @@ from decimal import Decimal
 from codexbar.application.history import HistoryError, HistoryState
 from codexbar.application.history_runtime import HistoryCapturingUsageProvider, HistoryService
 from codexbar.application.ports import UsageProvider
+from codexbar.application.reset_ledger_cli import print_reset_ledger_inspection
 from codexbar.application.settings import GetSettings, ResetSettings, SettingsLoadResult
 from codexbar.application.use_cases import GetCurrentUsage
 from codexbar.composition import build_gui_runtime, build_usage_provider
@@ -67,6 +68,19 @@ def build_parser() -> argparse.ArgumentParser:
     history_sub.add_parser(
         "clear",
         help="destructively clear all stored usage history while preserving the schema",
+    )
+
+    reset_ledger = subparsers.add_parser(
+        "reset-ledger",
+        help="inspect persistent reset-credit evidence storage",
+    )
+    reset_ledger_sub = reset_ledger.add_subparsers(
+        dest="reset_ledger_command",
+        required=True,
+    )
+    reset_ledger_sub.add_parser(
+        "inspect",
+        help="inspect local reset-credit event ledger",
     )
 
     return parser
@@ -280,6 +294,13 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.command == "history":
         return _run_history(args.history_command)
+
+    if args.command == "reset-ledger":
+        if args.reset_ledger_command == "inspect":
+            return print_reset_ledger_inspection()
+        raise AssertionError(
+            f"unsupported reset-ledger command: {args.reset_ledger_command}"
+        )
 
     if args.diagnose_indicator:
         return _run_indicator_diagnostics()

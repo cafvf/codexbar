@@ -12,6 +12,7 @@ from codexbar.application.analytics import HistoricalAnalysisService
 from codexbar.application.current_account import CurrentAccountController
 from codexbar.application.history_runtime import HistoryCapturingUsageProvider, HistoryService
 from codexbar.application.ports import NotificationPort, UsageProvider
+from codexbar.application.reset_ledger_service import ResetLedgerService
 from codexbar.application.settings import SettingsRepository
 from codexbar.application.usage_adapter import AccountUsageProvider
 from codexbar.infrastructure.account_reader import CodexAccountRateLimitsReader
@@ -22,6 +23,8 @@ from codexbar.infrastructure.history_sqlite import (
 )
 from codexbar.infrastructure.mock_provider import MockUsageProvider
 from codexbar.infrastructure.notifications import NotifySendNotificationAdapter
+from codexbar.infrastructure.reset_event_paths import reset_ledger_database_path
+from codexbar.infrastructure.reset_event_sqlite import SqliteResetEventRepository
 from codexbar.infrastructure.settings import JsonSettingsRepository
 from codexbar.ui.history_controller import HistoryController
 
@@ -34,6 +37,7 @@ class GuiRuntime:
     history_controller: HistoryController
     account_controller: CurrentAccountController | None = None
     operation_coordinator: AccountOperationCoordinator | None = None
+    reset_ledger_service: ResetLedgerService | None = None
 
     def close(self) -> None:
         self.history_controller.close()
@@ -42,19 +46,17 @@ class GuiRuntime:
 
 
 def build_usage_provider(*, mock: bool = False) -> UsageProvider:
-    """Build the one-shot compatibility provider without importing GUI frameworks."""
     if mock:
         return MockUsageProvider()
     return AccountUsageProvider(CodexAccountRateLimitsReader())
 
 
 def build_gui_runtime(*, mock: bool = False) -> GuiRuntime:
-    """Build v1.5 GUI runtime dependencies while preserving the v1.4 UI contract."""
-    path = history_database_path()
-    history_repository = SqliteHistoryRepository(path)
+    history_path = history_database_path()
+    history_repository = SqliteHistoryRepository(history_path)
     history_service = HistoryService(history_repository)
     history_controller = HistoryController(
-        HistoricalAnalysisService(open_history_analytics_repository(path))
+        HistoricalAnalysisService(open_history_analytics_repository(history_path))
     )
     settings_repository = JsonSettingsRepository()
     notifier = NotifySendNotificationAdapter()
@@ -71,9 +73,15 @@ def build_gui_runtime(*, mock: bool = False) -> GuiRuntime:
             history_controller=history_controller,
         )
 
+    reset_repository = SqliteResetEventRepository(reset_ledger_database_path())
+    reset_ledger_service = ResetLedgerService(reset_repository)
     coordinator = AccountOperationCoordinator()
     reader: AccountRateLimitsReader = CodexAccountRateLimitsReader()
-    reader = CapturingAccountRateLimitsReader(reader, history_service)
+    reader = CapturingAccountRateLimitsReader(
+        reader,
+        history_service,
+        reset_ledger_service,
+    )
     reader = CoordinatedAccountRateLimitsReader(reader, coordinator)
 
     return GuiRuntime(
@@ -83,4 +91,5 @@ def build_gui_runtime(*, mock: bool = False) -> GuiRuntime:
         history_controller=history_controller,
         account_controller=CurrentAccountController(reader),
         operation_coordinator=coordinator,
+        reset_ledger_service=reset_ledger_service,
     )

@@ -79,7 +79,9 @@ def refresh_once(controller: TrayController) -> None:
     controller.poll()
 
 
-def test_inv_alert_004_settings_schema_v1_is_unchanged(tmp_path: Path) -> None:
+def test_inv_alert_004_settings_save_preserves_alert_values_in_schema_v2(
+    tmp_path: Path,
+) -> None:
     repository = JsonSettingsRepository(
         env={"HOME": str(tmp_path), "XDG_CONFIG_HOME": str(tmp_path / "config")}
     )
@@ -88,10 +90,11 @@ def test_inv_alert_004_settings_schema_v1_is_unchanged(tmp_path: Path) -> None:
     payload = json.loads(repository.path.read_text(encoding="utf-8"))
 
     assert payload == {
-        "schema_version": 1,
+        "schema_version": 2,
         "low_remaining_threshold": "0.20",
         "refresh_interval_seconds": 60,
         "notifications_enabled": True,
+        "usage_reserves": {},
     }
 
 

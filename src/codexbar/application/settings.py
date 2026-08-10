@@ -18,6 +18,11 @@ class SettingsLoadResult:
     settings: AppSettings
     origin: SettingsOrigin
     diagnostic: SettingsError | None = None
+    source_schema_version: int | None = None
+
+    @property
+    def migrated_from_schema_v1(self) -> bool:
+        return self.origin is SettingsOrigin.PERSISTED and self.source_schema_version == 1
 
 
 class SettingsRepository(Protocol):

@@ -25,10 +25,11 @@ SETTINGS_KEYS = {
     "low_remaining_threshold",
     "refresh_interval_seconds",
     "notifications_enabled",
+    "usage_reserves",
 }
 
 
-def test_regression_v1_1_settings_schema_remains_version_1_without_history_fields(
+def test_regression_settings_schema_v2_has_no_history_fields(
     tmp_path,
 ) -> None:
     repository = JsonSettingsRepository(
@@ -42,7 +43,8 @@ def test_regression_v1_1_settings_schema_remains_version_1_without_history_field
     payload = json.loads(repository.path.read_text(encoding="utf-8"))
 
     assert set(payload) == SETTINGS_KEYS
-    assert payload["schema_version"] == 1
+    assert payload["schema_version"] == 2
+    assert payload["usage_reserves"] == {}
     assert not any("history" in key for key in payload)
 
 
@@ -52,6 +54,7 @@ def test_regression_v1_1_settings_defaults_are_unchanged() -> None:
     assert settings.low_remaining_threshold == Fraction(Decimal("0.20"))
     assert settings.refresh_interval_seconds.value == 60
     assert settings.notifications_enabled is DEFAULT_NOTIFICATIONS_ENABLED
+    assert settings.usage_reserves.entries == ()
     assert MIN_REFRESH_INTERVAL_SECONDS == 10
     assert MAX_REFRESH_INTERVAL_SECONDS == 3600
 

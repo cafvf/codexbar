@@ -16,11 +16,16 @@ from codexbar.domain.errors import (
     SettingsSchemaError,
     SettingsWriteError,
 )
-from codexbar.domain.models import Fraction
-from codexbar.domain.settings import AppSettings, RefreshIntervalSeconds
+from codexbar.domain.models import Fraction, UsageWindowId
+from codexbar.domain.settings import (
+    AppSettings,
+    RefreshIntervalSeconds,
+    UsageReserve,
+    UsageReservePolicy,
+)
 
-_SCHEMA_VERSION = 1
-_EXPECTED_KEYS = frozenset(
+_SCHEMA_VERSION = 2
+_SCHEMA_1_KEYS = frozenset(
     {
         "schema_version",
         "low_remaining_threshold",
@@ -28,6 +33,7 @@ _EXPECTED_KEYS = frozenset(
         "notifications_enabled",
     }
 )
+_SCHEMA_2_KEYS = _SCHEMA_1_KEYS | {"usage_reserves"}
 
 
 class JsonSettingsRepository:
@@ -54,7 +60,7 @@ class JsonSettingsRepository:
 
         try:
             payload = json.loads(raw)
-            settings = _decode_settings(payload)
+            settings, source_schema_version = _decode_settings(payload)
         except (json.JSONDecodeError, SettingsDocumentError, ValueError) as exc:
             document_error = (
                 exc
@@ -67,7 +73,11 @@ class JsonSettingsRepository:
                 document_error,
             )
 
-        return SettingsLoadResult(settings, SettingsOrigin.PERSISTED)
+        return SettingsLoadResult(
+            settings,
+            SettingsOrigin.PERSISTED,
+            source_schema_version=source_schema_version,
+        )
 
     def save(self, settings: AppSettings) -> None:
         payload = _encode_settings(settings)
@@ -141,34 +151,41 @@ def _encode_settings(settings: AppSettings) -> dict[str, object]:
         "low_remaining_threshold": str(settings.low_remaining_threshold.value),
         "refresh_interval_seconds": settings.refresh_interval_seconds.value,
         "notifications_enabled": settings.notifications_enabled,
+        "usage_reserves": {
+            entry.window_id.value: str(entry.reserve.value)
+            for entry in sorted(
+                settings.usage_reserves.entries,
+                key=lambda item: item.window_id.value,
+            )
+        },
     }
 
 
-def _decode_settings(payload: Any) -> AppSettings:
+def _decode_settings(payload: Any) -> tuple[AppSettings, int]:
     if not isinstance(payload, dict):
         raise SettingsDocumentError("settings document must be a JSON object")
 
-    if frozenset(payload) != _EXPECTED_KEYS:
-        unknown = sorted(set(payload) - _EXPECTED_KEYS)
-        missing = sorted(_EXPECTED_KEYS - set(payload))
-        detail = []
-        if unknown:
-            detail.append(f"unknown fields: {', '.join(unknown)}")
-        if missing:
-            detail.append(f"missing fields: {', '.join(missing)}")
-        raise SettingsSchemaError("; ".join(detail) or "settings fields do not match schema")
+    schema_version = payload.get("schema_version")
+    if isinstance(schema_version, bool) or not isinstance(schema_version, int):
+        raise SettingsSchemaError(
+            f"unsupported settings schema version: {schema_version!r}"
+        )
 
-    schema_version = payload["schema_version"]
-    if isinstance(schema_version, bool) or schema_version != _SCHEMA_VERSION:
-        raise SettingsSchemaError(f"unsupported settings schema version: {schema_version!r}")
+    if schema_version == 1:
+        _validate_keys(payload, _SCHEMA_1_KEYS)
+        reserves = UsageReservePolicy()
+    elif schema_version == 2:
+        _validate_keys(payload, _SCHEMA_2_KEYS)
+        reserves = _decode_usage_reserves(payload["usage_reserves"])
+    else:
+        raise SettingsSchemaError(
+            f"unsupported settings schema version: {schema_version!r}"
+        )
 
-    threshold_raw = payload["low_remaining_threshold"]
-    if not isinstance(threshold_raw, str):
-        raise SettingsDocumentError("low_remaining_threshold must be a decimal string")
-    try:
-        threshold = Fraction(Decimal(threshold_raw))
-    except (InvalidOperation, ValueError) as exc:
-        raise SettingsDocumentError("invalid low_remaining_threshold") from exc
+    threshold = _decode_fraction_string(
+        payload["low_remaining_threshold"],
+        "low_remaining_threshold",
+    )
 
     refresh_raw = payload["refresh_interval_seconds"]
     if isinstance(refresh_raw, bool) or not isinstance(refresh_raw, int):
@@ -179,10 +196,65 @@ def _decode_settings(payload: Any) -> AppSettings:
         raise SettingsDocumentError("notifications_enabled must be a boolean")
 
     try:
-        return AppSettings(
+        settings = AppSettings(
             low_remaining_threshold=threshold,
             refresh_interval_seconds=RefreshIntervalSeconds(refresh_raw),
             notifications_enabled=notifications_raw,
+            usage_reserves=reserves,
         )
     except ValueError as exc:
         raise SettingsDocumentError(f"invalid settings value: {exc}") from exc
+
+    return settings, schema_version
+
+
+def _validate_keys(payload: dict[str, Any], expected: frozenset[str]) -> None:
+    if frozenset(payload) == expected:
+        return
+    unknown = sorted(set(payload) - expected)
+    missing = sorted(expected - set(payload))
+    detail = []
+    if unknown:
+        detail.append(f"unknown fields: {', '.join(unknown)}")
+    if missing:
+        detail.append(f"missing fields: {', '.join(missing)}")
+    raise SettingsSchemaError(
+        "; ".join(detail) or "settings fields do not match schema"
+    )
+
+
+def _decode_fraction_string(value: object, field: str) -> Fraction:
+    if not isinstance(value, str):
+        raise SettingsDocumentError(f"{field} must be a decimal string")
+    try:
+        return Fraction(Decimal(value))
+    except (InvalidOperation, ValueError) as exc:
+        raise SettingsDocumentError(f"invalid {field}") from exc
+
+
+def _decode_usage_reserves(value: object) -> UsageReservePolicy:
+    if not isinstance(value, dict):
+        raise SettingsDocumentError("usage_reserves must be an object")
+
+    entries: list[UsageReserve] = []
+    for raw_window_id, raw_reserve in value.items():
+        if not isinstance(raw_window_id, str) or not raw_window_id.strip():
+            raise SettingsDocumentError(
+                "usage_reserves keys must be non-empty window-id strings"
+            )
+        reserve = _decode_fraction_string(
+            raw_reserve,
+            f"usage_reserves[{raw_window_id!r}]",
+        )
+        try:
+            entries.append(
+                UsageReserve(UsageWindowId(raw_window_id), reserve)
+            )
+        except ValueError as exc:
+            raise SettingsDocumentError(
+                f"invalid usage reserve for {raw_window_id!r}: {exc}"
+            ) from exc
+
+    return UsageReservePolicy(
+        tuple(sorted(entries, key=lambda item: item.window_id.value))
+    )

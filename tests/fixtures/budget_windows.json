@@ -1,0 +1,23 @@
+{
+  "windows": [
+    {
+      "id": "window_300m",
+      "label": "5 hours",
+      "remaining": "0.43"
+    },
+    {
+      "id": "window_10080m",
+      "label": "Weekly",
+      "remaining": "0.18"
+    },
+    {
+      "id": "window_future",
+      "label": "Future window",
+      "remaining": "0.50"
+    }
+  ],
+  "usage_reserves": {
+    "window_300m": "0.10",
+    "window_10080m": "0.15"
+  }
+}

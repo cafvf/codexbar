@@ -101,6 +101,16 @@ def _print_settings(result: SettingsLoadResult) -> None:
     print(f"Refresh interval: {settings.refresh_interval_seconds.value} seconds")
     notifications = "enabled" if settings.notifications_enabled else "disabled"
     print(f"Notifications: {notifications}")
+    print(f"Settings schema source: {result.source_schema_version or 'defaults'}")
+    if not settings.usage_reserves.entries:
+        print("Usage reserves: none")
+    else:
+        print("Usage reserves:")
+        for entry in settings.usage_reserves.entries:
+            print(
+                f"  {entry.window_id.value}: "
+                f"{_format_percent(entry.reserve.value)}%"
+            )
     if result.diagnostic is not None:
         print(f"Diagnostic: {result.diagnostic}")
 

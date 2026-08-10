@@ -70,21 +70,35 @@ class BudgetPanel(QFrame):
             self._body.setText("No budget state yet.")
             return
 
-        lines = []
+        labels = {
+            window.window_id: window.label
+            for window in state.usage.windows
+        }
+        lines: list[str] = []
         for budget in state.budget.windows:
+            label = labels.get(budget.window_id, budget.window_id.value)
             reserve = (
-                "not configured"
+                "Not set"
                 if budget.reserve is None
                 else f"{_percent(budget.reserve.value)}%"
             )
-            lines.append(
-                f"{budget.window_id.value}: reserve {reserve}; "
-                f"usable headroom {_percent(budget.headroom.value)}%; "
-                f"{budget.status.value}"
+            status = _budget_status_text(budget.status.value)
+            lines.extend(
+                (
+                    label,
+                    f"  Remaining: {_percent(budget.remaining.value)}%",
+                    f"  Reserved: {reserve}",
+                    f"  Available to use: {_percent(budget.headroom.value)}%",
+                    f"  Status: {status}",
+                    "",
+                )
             )
-        lines.append(
-            f"Opportunity: {state.budget.advice.priority.value} — "
-            f"{state.budget.advice.reason}"
+        lines.extend(
+            (
+                "Reset recommendation",
+                f"  {state.budget.advice.priority.value}: "
+                f"{state.budget.advice.reason}",
+            )
         )
         self._body.setText("\n".join(lines))
 
@@ -126,14 +140,26 @@ class RedeemPanel(QFrame):
             return
 
         unresolved = state.redeem.unresolved
+        has_available_credit = (
+            state.reset.available_count is not None
+            and state.reset.available_count > 0
+        )
+
         if unresolved:
             self._status.setText(
                 f"Unresolved attempt: {unresolved[0].attempt_id.value} "
                 f"({unresolved[0].status.value})."
             )
+        elif has_available_credit:
+            self._status.setText("Reset credit available for manual redemption.")
         else:
-            self._status.setText("No unresolved redeem attempt.")
-        self._redeem.setEnabled(not self._active and not unresolved)
+            self._status.setText("No reset credits available.")
+
+        self._redeem.setEnabled(
+            not self._active
+            and not unresolved
+            and has_available_credit
+        )
         self._retry.setEnabled(not self._active and bool(unresolved))
 
     def _confirm_redeem(self) -> None:
@@ -240,6 +266,26 @@ class CurrentAccountPanel(RichUsagePanel):
         self.reset_panel.render_account_state(account)
         self.budget_panel.render_account_state(account)
         self.redeem_panel.render_account_state(account)
+
+    def current_usage_windows(
+        self,
+    ) -> tuple[tuple[UsageWindowId, str], ...]:
+        account = self._presenter.current()
+        if account is None:
+            return ()
+        return tuple(
+            (window.window_id, window.label)
+            for window in account.usage.windows
+        )
+
+
+def _budget_status_text(value: str) -> str:
+    return {
+        "no_policy": "No reserve policy",
+        "above_reserve": "Within budget",
+        "at_reserve": "At reserve",
+        "below_reserve": "Below reserve",
+    }.get(value, value.replace("_", " ").title())
 
 
 def _percent(value: Decimal) -> str:

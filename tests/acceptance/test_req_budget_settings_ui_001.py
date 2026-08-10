@@ -1,8 +1,10 @@
 from pathlib import Path
 
 
-def test_settings_dialog_exposes_canonical_reserve_fields() -> None:
+def test_settings_dialog_uses_current_reported_windows_not_fixed_ids() -> None:
     source = Path("src/codexbar/ui/settings.py").read_text()
-    assert "five_hour_reserve_input" in source
-    assert "weekly_reserve_input" in source
-    assert "usage_reserves=reserves" in source
+
+    assert "current_usage_windows" in source
+    assert 'UsageWindowId("window_300m")' not in source
+    assert 'UsageWindowId("window_10080m")' not in source
+    assert "No current usage windows available to configure." in source

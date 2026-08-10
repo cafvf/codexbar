@@ -3,6 +3,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from dataclasses import dataclass
 from decimal import Decimal, InvalidOperation
+from typing import Protocol, cast
 
 from PySide6.QtWidgets import (
     QCheckBox,
@@ -32,6 +33,17 @@ from codexbar.domain.settings import (
 )
 
 
+class CurrentWindowSource(Protocol):
+    def current_usage_windows(self) -> tuple[tuple[UsageWindowId, str], ...]: ...
+
+
+@dataclass(frozen=True, slots=True)
+class ReserveField:
+    window_id: UsageWindowId
+    label: str
+    input: QLineEdit
+
+
 @dataclass(frozen=True, slots=True)
 class SettingsActions:
     repository: SettingsRepository
@@ -57,8 +69,9 @@ class SettingsDialog(QDialog):
     ) -> None:
         super().__init__(parent)
         self._actions = actions
+        self._reserve_fields: tuple[ReserveField, ...] = ()
         self.setWindowTitle("CodexBar Settings")
-        self.setMinimumWidth(380)
+        self.setMinimumWidth(420)
 
         layout = QVBoxLayout(self)
         form = QFormLayout()
@@ -71,13 +84,19 @@ class SettingsDialog(QDialog):
         self.refresh_interval_input.setPlaceholderText("60")
         form.addRow("Refresh interval (seconds):", self.refresh_interval_input)
 
-        self.five_hour_reserve_input = QLineEdit(self)
-        self.five_hour_reserve_input.setPlaceholderText("empty = no reserve")
-        form.addRow("5h reserve:", self.five_hour_reserve_input)
+        reserve_fields = []
+        for window_id, label in _current_windows(parent):
+            line_edit = QLineEdit(self)
+            line_edit.setPlaceholderText("empty = no reserve")
+            reserve_fields.append(ReserveField(window_id, label, line_edit))
+            form.addRow(f"{label} reserve:", line_edit)
+        self._reserve_fields = tuple(reserve_fields)
 
-        self.weekly_reserve_input = QLineEdit(self)
-        self.weekly_reserve_input.setPlaceholderText("empty = no reserve")
-        form.addRow("Weekly reserve:", self.weekly_reserve_input)
+        if not self._reserve_fields:
+            form.addRow(
+                "Usage reserves:",
+                QLabel("No current usage windows available to configure.", self),
+            )
 
         self.notifications_checkbox = QCheckBox("Enable notifications", self)
         form.addRow("", self.notifications_checkbox)
@@ -103,16 +122,16 @@ class SettingsDialog(QDialog):
         self.save_button.clicked.connect(self._save)
         self._set_fields(settings)
 
+    @property
+    def reserve_fields(self) -> tuple[ReserveField, ...]:
+        return self._reserve_fields
+
     def _set_fields(self, settings: AppSettings) -> None:
         self.low_threshold_input.setText(str(settings.low_remaining_threshold.value))
         self.refresh_interval_input.setText(str(settings.refresh_interval_seconds.value))
         self.notifications_checkbox.setChecked(settings.notifications_enabled)
-        self.five_hour_reserve_input.setText(
-            _reserve_text(settings, UsageWindowId("window_300m"))
-        )
-        self.weekly_reserve_input.setText(
-            _reserve_text(settings, UsageWindowId("window_10080m"))
-        )
+        for field in self._reserve_fields:
+            field.input.setText(_reserve_text(settings, field.window_id))
 
     def _candidate_settings(self) -> AppSettings:
         threshold_text = self.low_threshold_input.text().strip()
@@ -127,29 +146,44 @@ class SettingsDialog(QDialog):
         try:
             refresh_seconds = int(refresh_text)
         except ValueError as exc:
-            raise ValueError("refresh interval must be an integer number of seconds") from exc
+            raise ValueError(
+                "refresh interval must be an integer number of seconds"
+            ) from exc
 
-        reserves = UsageReservePolicy(
-            tuple(
-                entry
-                for entry in (
-                    _reserve_entry(
-                        UsageWindowId("window_300m"),
-                        self.five_hour_reserve_input.text(),
-                    ),
-                    _reserve_entry(
-                        UsageWindowId("window_10080m"),
-                        self.weekly_reserve_input.text(),
-                    ),
+        current_ids = {
+            field.window_id.value
+            for field in self._reserve_fields
+        }
+        existing = GetSettings(self._actions.repository).execute().settings
+        reserves = [
+            entry
+            for entry in existing.usage_reserves.entries
+            if entry.window_id.value not in current_ids
+        ]
+        reserves.extend(
+            entry
+            for field in self._reserve_fields
+            if (
+                entry := _reserve_entry(
+                    field.window_id,
+                    field.input.text(),
                 )
-                if entry is not None
             )
+            is not None
         )
+
         return AppSettings(
             low_remaining_threshold=Fraction(threshold),
             refresh_interval_seconds=RefreshIntervalSeconds(refresh_seconds),
             notifications_enabled=self.notifications_checkbox.isChecked(),
-            usage_reserves=reserves,
+            usage_reserves=UsageReservePolicy(
+                tuple(
+                    sorted(
+                        reserves,
+                        key=lambda item: item.window_id.value,
+                    )
+                )
+            ),
         )
 
     def _save(self) -> None:
@@ -172,12 +206,25 @@ class SettingsDialog(QDialog):
         self.error_label.clear()
 
 
+def _current_windows(
+    parent: QWidget | None,
+) -> tuple[tuple[UsageWindowId, str], ...]:
+    provider = getattr(parent, "current_usage_windows", None)
+    if not callable(provider):
+        return ()
+    source = cast(CurrentWindowSource, parent)
+    return source.current_usage_windows()
+
+
 def _reserve_text(settings: AppSettings, window_id: UsageWindowId) -> str:
     reserve = settings.usage_reserves.reserve_for(window_id)
     return "" if reserve is None else str(reserve.value)
 
 
-def _reserve_entry(window_id: UsageWindowId, text: str) -> UsageReserve | None:
+def _reserve_entry(
+    window_id: UsageWindowId,
+    text: str,
+) -> UsageReserve | None:
     value = text.strip()
     if not value:
         return None

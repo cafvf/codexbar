@@ -138,13 +138,14 @@ def test_perf_guard_history_storage_is_not_called_from_ui_controller() -> None:
 
 
 def test_history_concrete_storage_is_confined_to_composition_and_infrastructure() -> None:
-    allowed = {
+    allowed_files = {
         Path("src/codexbar/__main__.py"),
         Path("src/codexbar/composition.py"),
-        Path("src/codexbar/infrastructure/history_sqlite.py"),
     }
+    infrastructure_root = Path("src/codexbar/infrastructure")
+
     for path in Path("src/codexbar").rglob("*.py"):
-        if path in allowed:
+        if path in allowed_files or path.is_relative_to(infrastructure_root):
             continue
         source = path.read_text(encoding="utf-8")
         assert "SqliteHistoryRepository" not in source, path

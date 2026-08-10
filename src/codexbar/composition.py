@@ -10,6 +10,7 @@ from codexbar.application.account_operations import (
 from codexbar.application.account_presentation import LatestAccountObservationReader
 from codexbar.application.account_runtime import CapturingAccountRateLimitsReader
 from codexbar.application.analytics import HistoricalAnalysisService
+from codexbar.application.context import HistoricalContextService
 from codexbar.application.current_account import CurrentAccountController
 from codexbar.application.history_runtime import HistoryService
 from codexbar.application.ports import NotificationPort, UsageProvider
@@ -18,6 +19,7 @@ from codexbar.application.reset_ledger_service import ResetLedgerService
 from codexbar.application.settings import GetSettings, SettingsRepository
 from codexbar.application.usage_adapter import AccountUsageProvider
 from codexbar.infrastructure.account_reader import CodexAccountRateLimitsReader
+from codexbar.infrastructure.context_history import SqliteContextHistoryRepository
 from codexbar.infrastructure.history_paths import history_database_path
 from codexbar.infrastructure.history_sqlite import (
     SqliteHistoryRepository,
@@ -43,6 +45,7 @@ class GuiRuntime:
     settings_repository: SettingsRepository
     notifier: NotificationPort
     history_controller: HistoryController
+    context_service: HistoricalContextService
     account_controller: CurrentAccountController | None = None
     operation_coordinator: AccountOperationCoordinator | None = None
     reset_ledger_service: ResetLedgerService | None = None
@@ -67,6 +70,9 @@ def build_gui_runtime(*, mock: bool = False) -> GuiRuntime:
     history_service = HistoryService(history_repository)
     history_controller = HistoryController(
         HistoricalAnalysisService(open_history_analytics_repository(history_path))
+    )
+    context_service = HistoricalContextService(
+        SqliteContextHistoryRepository(history_repository)
     )
     settings_repository = JsonSettingsRepository()
     settings = GetSettings(settings_repository).execute().settings
@@ -108,6 +114,7 @@ def build_gui_runtime(*, mock: bool = False) -> GuiRuntime:
         settings_repository=settings_repository,
         notifier=notifier,
         history_controller=history_controller,
+        context_service=context_service,
         account_controller=CurrentAccountController(coordinated_reader),
         operation_coordinator=coordinator,
         reset_ledger_service=reset_ledger_service,

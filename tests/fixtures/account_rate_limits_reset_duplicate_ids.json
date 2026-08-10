@@ -1,0 +1,37 @@
+{
+  "id": 1,
+  "result": {
+    "rateLimits": {
+      "primary": {
+        "usedPercent": 10,
+        "windowDurationMins": 300,
+        "resetsAt": 1786388400
+      },
+      "secondary": null,
+      "rateLimitReachedType": null
+    },
+    "rateLimitResetCredits": {
+      "availableCount": 2,
+      "credits": [
+        {
+          "id": "same",
+          "resetType": "codexRateLimits",
+          "status": "available",
+          "grantedAt": 1786276800,
+          "expiresAt": 1786449600,
+          "title": null,
+          "description": null
+        },
+        {
+          "id": "same",
+          "resetType": "codexRateLimits",
+          "status": "available",
+          "grantedAt": 1786276800,
+          "expiresAt": 1786449600,
+          "title": null,
+          "description": null
+        }
+      ]
+    }
+  }
+}

@@ -1,8 +1,9 @@
 from __future__ import annotations
 
-from collections.abc import Iterable
+from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
+from decimal import Decimal
 from enum import StrEnum
 
 from codexbar.domain.models import Fraction, UsageWindowId
@@ -132,6 +133,82 @@ class ContextReferenceSelection:
             raise ValueError("non-ready context selection must not contain a reference set")
 
 
+class ContextCoverage(StrEnum):
+    INSUFFICIENT = "insufficient"
+    SPARSE = "sparse"
+    LIMITED = "limited"
+    ESTABLISHED = "established"
+
+    @classmethod
+    def from_cycle_count(cls, cycle_count: int) -> ContextCoverage:
+        if cycle_count < 0:
+            raise ValueError("cycle count must not be negative")
+        if cycle_count <= 2:
+            return cls.INSUFFICIENT
+        if cycle_count <= 4:
+            return cls.SPARSE
+        if cycle_count <= 9:
+            return cls.LIMITED
+        return cls.ESTABLISHED
+
+
+@dataclass(frozen=True, slots=True)
+class ContextRank:
+    """Factual comparison counts for the current value against historical values."""
+
+    greater_count: int
+    equal_count: int
+    lower_count: int
+
+    def __post_init__(self) -> None:
+        if min(self.greater_count, self.equal_count, self.lower_count) < 0:
+            raise ValueError("rank counts must not be negative")
+
+    @property
+    def total_count(self) -> int:
+        return self.greater_count + self.equal_count + self.lower_count
+
+    @property
+    def has_ties(self) -> bool:
+        return self.equal_count > 0
+
+    def describe(self) -> str:
+        return (
+            f"{self.greater_count} historical values greater, "
+            f"{self.equal_count} equal, {self.lower_count} lower"
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class ContextEmpiricalSummary:
+    """Coverage-adaptive descriptive summary over independent comparable cycles."""
+
+    coverage: ContextCoverage
+    cycle_count: int
+    rank: ContextRank | None = None
+    observed_min: Decimal | None = None
+    observed_max: Decimal | None = None
+    median: Decimal | None = None
+    q25: Decimal | None = None
+    q75: Decimal | None = None
+
+    def __post_init__(self) -> None:
+        if self.coverage is not ContextCoverage.from_cycle_count(self.cycle_count):
+            raise ValueError("coverage must match cycle count")
+        if self.coverage is ContextCoverage.INSUFFICIENT and any(
+            value is not None
+            for value in (
+                self.rank,
+                self.observed_min,
+                self.observed_max,
+                self.median,
+                self.q25,
+                self.q75,
+            )
+        ):
+            raise ValueError("insufficient coverage must suppress unsupported statistics")
+
+
 def contextual_tolerance(current: TimeToReset) -> timedelta:
     """Return min(0.05*h*, 2 hours) using exact integer scaling."""
 
@@ -218,6 +295,96 @@ def select_context_references(
             current_time_to_reset=current_time,
             observations=tuple(selected),
         ),
+    )
+
+
+def empirical_median(values: Sequence[Decimal]) -> Decimal:
+    """Return the exact Decimal median of a non-empty sequence."""
+
+    ordered = sorted(values)
+    if not ordered:
+        raise ValueError("median requires at least one value")
+    middle = len(ordered) // 2
+    if len(ordered) % 2:
+        return ordered[middle]
+    return (ordered[middle - 1] + ordered[middle]) / Decimal(2)
+
+
+def empirical_quantile(values: Sequence[Decimal], p: Decimal) -> Decimal:
+    """Linear interpolation at fractional index (N - 1) * p."""
+
+    if not Decimal(0) <= p <= Decimal(1):
+        raise ValueError("quantile probability must be between zero and one")
+    ordered = sorted(values)
+    if not ordered:
+        raise ValueError("quantile requires at least one value")
+    if len(ordered) == 1:
+        return ordered[0]
+
+    index = Decimal(len(ordered) - 1) * p
+    lower_index = int(index)
+    upper_index = min(lower_index + 1, len(ordered) - 1)
+    fraction = index - Decimal(lower_index)
+    lower = ordered[lower_index]
+    upper = ordered[upper_index]
+    return lower + (upper - lower) * fraction
+
+
+def empirical_rank(*, current: Decimal, historical: Sequence[Decimal]) -> ContextRank:
+    """Return strict greater/equal/lower counts, preserving ties explicitly."""
+
+    return ContextRank(
+        greater_count=sum(value > current for value in historical),
+        equal_count=sum(value == current for value in historical),
+        lower_count=sum(value < current for value in historical),
+    )
+
+
+def summarize_context_reference_set(
+    *,
+    current_remaining: Fraction,
+    reference_set: ContextReferenceSet,
+) -> ContextEmpiricalSummary:
+    """Build the frozen coverage-adaptive descriptive summary."""
+
+    values = tuple(observation.remaining.value for observation in reference_set.observations)
+    coverage = ContextCoverage.from_cycle_count(len(values))
+
+    if coverage is ContextCoverage.INSUFFICIENT:
+        return ContextEmpiricalSummary(
+            coverage=coverage,
+            cycle_count=len(values),
+        )
+
+    rank = empirical_rank(current=current_remaining.value, historical=values)
+
+    if coverage is ContextCoverage.SPARSE:
+        return ContextEmpiricalSummary(
+            coverage=coverage,
+            cycle_count=len(values),
+            rank=rank,
+            observed_min=min(values),
+            observed_max=max(values),
+        )
+
+    median = empirical_median(values)
+    if coverage is ContextCoverage.LIMITED:
+        return ContextEmpiricalSummary(
+            coverage=coverage,
+            cycle_count=len(values),
+            rank=rank,
+            observed_min=min(values),
+            observed_max=max(values),
+            median=median,
+        )
+
+    return ContextEmpiricalSummary(
+        coverage=coverage,
+        cycle_count=len(values),
+        rank=rank,
+        median=median,
+        q25=empirical_quantile(values, Decimal("0.25")),
+        q75=empirical_quantile(values, Decimal("0.75")),
     )
 
 

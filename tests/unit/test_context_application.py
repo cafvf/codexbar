@@ -85,6 +85,7 @@ def test_task_643_current_snapshot_is_reused_and_query_is_exactly_180_days() -> 
 
     assert result.state is HistoricalContextState.UNAVAILABLE
     assert result.reason is HistoricalContextReason.NO_HISTORICAL_OBSERVATIONS
+    assert result.comparable_cycle_count == 0
     assert repository.calls == [
         (
             WINDOW,
@@ -105,8 +106,10 @@ def test_task_644_missing_current_window_and_reset_are_explicit() -> None:
 
     assert missing_window.state is HistoricalContextState.UNAVAILABLE
     assert missing_window.reason is HistoricalContextReason.CURRENT_WINDOW_MISSING
+    assert missing_window.comparable_cycle_count == 0
     assert missing_reset.state is HistoricalContextState.UNAVAILABLE
     assert missing_reset.reason is HistoricalContextReason.CURRENT_RESET_MISSING
+    assert missing_reset.comparable_cycle_count == 0
     assert repository.calls == []
 
 
@@ -121,6 +124,7 @@ def test_task_645_history_failure_is_contained_in_context_result() -> None:
 
     assert result.state is HistoricalContextState.UNAVAILABLE
     assert result.reason is HistoricalContextReason.HISTORY_UNAVAILABLE
+    assert result.comparable_cycle_count is None
     assert result.diagnostic == "history unavailable"
     assert current.windows[0].remaining.value == Decimal("0.35")
 
@@ -154,6 +158,7 @@ def test_task_644_two_cycles_are_insufficient_and_statistics_are_suppressed() ->
 
     assert result.state is HistoricalContextState.INSUFFICIENT
     assert result.reason is HistoricalContextReason.TOO_FEW_COMPARABLE_CYCLES
+    assert result.comparable_cycle_count == 2
     assert result.summary is None
 
 
@@ -174,6 +179,7 @@ def test_task_644_three_cycles_produce_sufficient_sparse_summary() -> None:
     assert result.state is HistoricalContextState.SUFFICIENT
     assert result.reason is None
     assert result.summary is not None
+    assert result.comparable_cycle_count == 3
     assert result.summary.coverage is ContextCoverage.SPARSE
     assert result.summary.cycle_count == 3
 

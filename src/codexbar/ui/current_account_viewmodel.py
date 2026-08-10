@@ -4,6 +4,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime
 from enum import StrEnum
+from typing import TYPE_CHECKING
 
 from codexbar.application.account import AccountRateLimitsObservation
 from codexbar.application.account_presentation import LatestAccountObservationReader
@@ -23,6 +24,9 @@ from codexbar.domain.reset import (
 )
 from codexbar.domain.settings import AppSettings
 from codexbar.ui.viewmodel import UsageViewModel, UsageViewState
+
+if TYPE_CHECKING:
+    from codexbar.ui.context_viewmodel import ContextPresenter
 
 
 class ResetCurrentKind(StrEnum):
@@ -87,6 +91,7 @@ class CurrentAccountPresenter:
         self._redeem_manager = redeem_manager
         self._policy = ResetOpportunityPolicy()
         self._clock = clock or datetime.now
+        self.context_presenter: ContextPresenter | None = None
 
     def apply_settings(self, settings: AppSettings) -> None:
         self._budget_runtime.apply_settings(settings)

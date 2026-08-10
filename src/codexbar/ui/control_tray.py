@@ -8,6 +8,7 @@ from codexbar.application.ports import NotificationPort, UsageProvider
 from codexbar.application.redeem import RedeemProcessManager
 from codexbar.application.settings import SettingsRepository
 from codexbar.domain.settings import AppSettings
+from codexbar.ui.context_viewmodel import ContextPresenter
 from codexbar.ui.control_panel import CurrentAccountPanel
 from codexbar.ui.current_account_viewmodel import CurrentAccountPresenter
 from codexbar.ui.history_controller import HistoryController
@@ -25,11 +26,13 @@ class ControlTrayShell(HistoricalTrayShell):
         history_controller: HistoryController,
         presenter: CurrentAccountPresenter,
         redeem_manager: RedeemProcessManager | None,
+        context_presenter: ContextPresenter | None = None,
     ) -> None:
         self._presenter = presenter
         panel = CurrentAccountPanel(
             presenter,
             redeem_manager,
+            context_presenter=context_presenter,
             on_history=self.show_history_for_window,
             on_redeem_changed=self.refresh,
         )
@@ -56,6 +59,7 @@ def run_tray(
     history_controller: HistoryController,
     presenter: CurrentAccountPresenter,
     redeem_manager: RedeemProcessManager | None,
+    context_presenter: ContextPresenter | None = None,
 ) -> int:
     instance = QApplication.instance()
     app = instance if isinstance(instance, QApplication) else QApplication(sys.argv)
@@ -69,6 +73,7 @@ def run_tray(
         history_controller,
         presenter,
         redeem_manager,
+        context_presenter,
     )
     shell.start()
     return app.exec()

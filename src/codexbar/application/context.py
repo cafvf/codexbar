@@ -53,9 +53,12 @@ class HistoricalContextResult:
     state: HistoricalContextState
     reason: HistoricalContextReason | None = None
     summary: ContextEmpiricalSummary | None = None
+    comparable_cycle_count: int | None = None
     diagnostic: str | None = None
 
     def __post_init__(self) -> None:
+        if self.comparable_cycle_count is not None and self.comparable_cycle_count < 0:
+            raise ValueError("comparable cycle count must not be negative")
         if self.state is HistoricalContextState.SUFFICIENT and self.summary is None:
             raise ValueError("sufficient context requires a summary")
         if self.state is not HistoricalContextState.SUFFICIENT and self.summary is not None:
@@ -64,6 +67,12 @@ class HistoricalContextResult:
             raise ValueError("sufficient context must not expose an absence reason")
         if self.state is not HistoricalContextState.SUFFICIENT and self.reason is None:
             raise ValueError("non-sufficient context requires an explicit reason")
+        if (
+            self.summary is not None
+            and self.comparable_cycle_count is not None
+            and self.summary.cycle_count != self.comparable_cycle_count
+        ):
+            raise ValueError("summary cycle count must match comparable cycle count")
 
 
 class HistoricalContextService:
@@ -83,6 +92,7 @@ class HistoricalContextService:
             return self._unavailable(
                 window_id,
                 HistoricalContextReason.CURRENT_WINDOW_MISSING,
+                comparable_cycle_count=0,
             )
 
         current_observation = ContextObservation(
@@ -96,11 +106,13 @@ class HistoricalContextService:
             return self._unavailable(
                 window_id,
                 HistoricalContextReason.CURRENT_RESET_MISSING,
+                comparable_cycle_count=0,
             )
         if window.resets_at < current.observed_at:
             return self._unavailable(
                 window_id,
                 HistoricalContextReason.CURRENT_RESET_INVALID,
+                comparable_cycle_count=0,
             )
 
         interval = HistoryInterval(
@@ -114,6 +126,7 @@ class HistoricalContextService:
                 window_id=window_id,
                 state=HistoricalContextState.UNAVAILABLE,
                 reason=HistoricalContextReason.HISTORY_UNAVAILABLE,
+                comparable_cycle_count=None,
                 diagnostic=str(exc),
             )
 
@@ -137,23 +150,28 @@ class HistoricalContextService:
                 window_id=window_id,
                 state=HistoricalContextState.INSUFFICIENT,
                 reason=HistoricalContextReason.TOO_FEW_COMPARABLE_CYCLES,
+                comparable_cycle_count=summary.cycle_count,
             )
 
         return HistoricalContextResult(
             window_id=window_id,
             state=HistoricalContextState.SUFFICIENT,
             summary=summary,
+            comparable_cycle_count=summary.cycle_count,
         )
 
     @staticmethod
     def _unavailable(
         window_id: UsageWindowId,
         reason: HistoricalContextReason,
+        *,
+        comparable_cycle_count: int | None,
     ) -> HistoricalContextResult:
         return HistoricalContextResult(
             window_id=window_id,
             state=HistoricalContextState.UNAVAILABLE,
             reason=reason,
+            comparable_cycle_count=comparable_cycle_count,
         )
 
     @classmethod
@@ -177,4 +195,8 @@ class HistoricalContextService:
         reason = reasons.get(state)
         if reason is None:
             raise ValueError(f"unsupported context selection state: {state}")
-        return cls._unavailable(window_id, reason)
+        return cls._unavailable(
+            window_id,
+            reason,
+            comparable_cycle_count=0,
+        )

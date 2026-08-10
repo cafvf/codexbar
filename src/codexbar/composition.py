@@ -25,6 +25,7 @@ from codexbar.infrastructure.history_sqlite import (
     SqliteHistoryRepository,
     open_history_analytics_repository,
 )
+from codexbar.infrastructure.mock_context import MockContextHistoryRepository
 from codexbar.infrastructure.mock_control import (
     MockAccountRateLimitsReader,
     MockResetCreditConsumer,
@@ -35,6 +36,7 @@ from codexbar.infrastructure.reset_consumer import CodexResetCreditConsumer
 from codexbar.infrastructure.reset_event_paths import reset_ledger_database_path
 from codexbar.infrastructure.reset_event_sqlite import SqliteResetEventRepository
 from codexbar.infrastructure.settings import JsonSettingsRepository
+from codexbar.ui.context_viewmodel import ContextPresenter
 from codexbar.ui.current_account_viewmodel import CurrentAccountPresenter
 from codexbar.ui.history_controller import HistoryController
 
@@ -46,6 +48,7 @@ class GuiRuntime:
     notifier: NotificationPort
     history_controller: HistoryController
     context_service: HistoricalContextService
+    context_presenter: ContextPresenter
     account_controller: CurrentAccountController | None = None
     operation_coordinator: AccountOperationCoordinator | None = None
     reset_ledger_service: ResetLedgerService | None = None
@@ -71,9 +74,12 @@ def build_gui_runtime(*, mock: bool = False) -> GuiRuntime:
     history_controller = HistoryController(
         HistoricalAnalysisService(open_history_analytics_repository(history_path))
     )
-    context_service = HistoricalContextService(
-        SqliteContextHistoryRepository(history_repository)
+    context_repository = (
+        MockContextHistoryRepository()
+        if mock
+        else SqliteContextHistoryRepository(history_repository)
     )
+    context_service = HistoricalContextService(context_repository)
     settings_repository = JsonSettingsRepository()
     settings = GetSettings(settings_repository).execute().settings
     notifier = NotifySendNotificationAdapter()
@@ -108,6 +114,8 @@ def build_gui_runtime(*, mock: bool = False) -> GuiRuntime:
         reset_ledger_service.projection,
         redeem_manager=redeem_manager,
     )
+    context_presenter = ContextPresenter(latest_reader, context_service)
+    presenter.context_presenter = context_presenter
 
     return GuiRuntime(
         provider=AccountUsageProvider(coordinated_reader),
@@ -115,6 +123,7 @@ def build_gui_runtime(*, mock: bool = False) -> GuiRuntime:
         notifier=notifier,
         history_controller=history_controller,
         context_service=context_service,
+        context_presenter=context_presenter,
         account_controller=CurrentAccountController(coordinated_reader),
         operation_coordinator=coordinator,
         reset_ledger_service=reset_ledger_service,

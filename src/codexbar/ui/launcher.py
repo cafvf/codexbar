@@ -6,6 +6,7 @@ from codexbar.application.ports import NotificationPort, UsageProvider
 from codexbar.application.redeem import RedeemProcessManager
 from codexbar.application.settings import GetSettings, SettingsRepository
 from codexbar.domain.settings import AppSettings
+from codexbar.ui.context_viewmodel import ContextPresenter
 from codexbar.ui.current_account_viewmodel import CurrentAccountPresenter
 from codexbar.ui.errors import GuiDependencyError
 from codexbar.ui.history_controller import HistoryController
@@ -33,6 +34,7 @@ ControlQtTrayRunner = Callable[
         HistoryController,
         CurrentAccountPresenter,
         RedeemProcessManager | None,
+        ContextPresenter | None,
     ],
     int,
 ]
@@ -81,6 +83,7 @@ def run_tray(
     history_controller: HistoryController | None = None,
     presenter: CurrentAccountPresenter | None = None,
     redeem_manager: RedeemProcessManager | None = None,
+    context_presenter: ContextPresenter | None = None,
 ) -> int:
     settings = GetSettings(repository).execute().settings
 
@@ -93,6 +96,7 @@ def run_tray(
             history_controller,
             presenter,
             redeem_manager,
+            context_presenter,
         )
 
     if history_controller is not None:

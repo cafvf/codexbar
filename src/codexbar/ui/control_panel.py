@@ -16,6 +16,8 @@ from codexbar.application.redeem import RedeemProcessManager
 from codexbar.application.reset_events import RedeemAttemptId
 from codexbar.domain.models import UsageWindowId
 from codexbar.domain.reset import ResetCreditId
+from codexbar.ui.context_panel import HistoricalContextPanel
+from codexbar.ui.context_viewmodel import ContextPresenter
 from codexbar.ui.controller import TrayViewState
 from codexbar.ui.current_account_viewmodel import (
     CurrentAccountPresenter,
@@ -243,11 +245,20 @@ class CurrentAccountPanel(RichUsagePanel):
         presenter: CurrentAccountPresenter,
         redeem_manager: RedeemProcessManager | None,
         *,
+        context_presenter: ContextPresenter | None = None,
         on_history: Callable[[UsageWindowId], None] | None = None,
         on_redeem_changed: Callable[[], None] | None = None,
     ) -> None:
         super().__init__(on_history=on_history)
         self._presenter = presenter
+        selected_context_presenter = context_presenter or getattr(
+            presenter, "context_presenter", None
+        )
+        self.context_panel = (
+            HistoricalContextPanel(selected_context_presenter, self)
+            if selected_context_presenter is not None
+            else None
+        )
         self.reset_panel = ResetCreditsPanel(self)
         self.budget_panel = BudgetPanel(self)
         self.redeem_panel = RedeemPanel(
@@ -256,6 +267,9 @@ class CurrentAccountPanel(RichUsagePanel):
             parent=self,
         )
         insert_at = max(0, self._layout.count() - 1)
+        if self.context_panel is not None:
+            self._layout.insertWidget(insert_at, self.context_panel)
+            insert_at += 1
         self._layout.insertWidget(insert_at, self.reset_panel)
         self._layout.insertWidget(insert_at + 1, self.budget_panel)
         self._layout.insertWidget(insert_at + 2, self.redeem_panel)
@@ -263,6 +277,8 @@ class CurrentAccountPanel(RichUsagePanel):
     def render_state(self, state: TrayViewState) -> None:
         super().render_state(state)
         account = self._presenter.current()
+        if self.context_panel is not None:
+            self.context_panel.refresh()
         self.reset_panel.render_account_state(account)
         self.budget_panel.render_account_state(account)
         self.redeem_panel.render_account_state(account)

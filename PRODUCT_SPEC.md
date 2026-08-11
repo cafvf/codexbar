@@ -1,9 +1,9 @@
 # CodexBar Product Specification
 
-Status: v1.5.0 release candidate
-Current validated baseline: 1.4.0
-Release candidate: 1.5.0
-Theme: Control
+Status: v1.6.0 release candidate
+Current validated baseline: 1.5.0
+Release candidate: 1.6.0
+Theme: Context
 
 ## Purpose
 
@@ -58,6 +58,20 @@ Read-only descriptive analytics, History UI, richer CURRENT details and stabiliz
 10. Native indicator/tray glance remains usage-focused; reset detail stays in Current Details.
 11. Mock/fault-injection validation covers destructive behavior without spending real credits.
 12. Real redeem validation is optional because it consumes a real credit.
+
+### v1.6 — Context
+1. Usage History retention expands to 180 days while remaining schema v1 and CURRENT-only.
+2. Context is anchored on authoritative `resets_at - observed_at` time-to-reset.
+3. Historical cycle identity is `(UsageWindowId, resets_at)`.
+4. Each prior cycle contributes at most one nearest real retained observation; no interpolation is introduced.
+5. Comparable-cycle tolerance is exactly `min(0.05*h*, 2 hours)`, inclusive.
+6. Coverage is based on independent comparable cycles: 0–2 Insufficient, 3–4 Sparse, 5–9 Limited, 10+ Established.
+7. Empirical median/range/quartiles/rank adapt to coverage and preserve ties explicitly.
+8. Historical context is a separate Open Details surface and does not enter the tray/native glance.
+9. Context failure is isolated from Current usage.
+10. Context has no authority over alerts, Control/Budget, notifications, or reset-credit redeem.
+11. Schema v1 and current indexes are retained after 180-day performance characterization.
+12. Real-account validation is read-only; missing runtime capability may be recorded as an explicit release SKIP.
 
 ## Non-functional invariants
 

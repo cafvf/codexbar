@@ -1,5 +1,34 @@
 # Changelog
 
+## 1.6.0 — 2026-08-10
+
+Release candidate **Context**.
+
+### Added
+- Historical context in Open Details using independent prior authoritative cycles at a matching time-to-reset;
+- exact hybrid comparison tolerance `min(0.05*h*, 2 hours)`;
+- coverage-adaptive empirical range/median/quartile/rank presentation;
+- explicit insufficient/unavailable Context states with history-failure isolation;
+- v1.6 target validation, physical smoke, traceability and release tooling.
+
+### Changed
+- usage-history retention expands from 30 to 180 days while retaining history schema v1;
+- cross-version Current/History/Control/Context composition was hardened and simplified;
+- project version advances to 1.6.0.
+
+### Compatibility and safety
+- Context remains descriptive and non-predictive;
+- Context does not influence alerts, Control/Budget, notifications or redeem;
+- native tray glance remains usage-only;
+- no History schema-v2 migration or speculative index is introduced.
+
+### Validation
+- Phase F target characterization: 17,280 snapshots / 34,560 window rows over 180 days;
+- history database fixture size: 7,868,416 bytes;
+- schema v1 retained after query/performance characterization;
+- fault, sampling-gap, timezone and pseudoreplication gates passed;
+- final Phase G evidence is recorded in `docs/VALIDATION-v1.6.0.md`.
+
 ## 1.5.0 — 2026-08-10
 
 Release candidate **Control**.

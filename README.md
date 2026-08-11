@@ -2,7 +2,7 @@
 
 CodexBar is a Linux tray application for monitoring Codex usage, retaining bounded observational history, and exposing explicit reset-credit control when the local Codex app-server provides that capability.
 
-Current release: **1.5.0 — Control**.
+Current release: **1.6.0 — Context**.
 
 ## What CodexBar does
 
@@ -13,7 +13,8 @@ The application currently provides:
 - current Codex usage and CURRENT/STALE fallback;
 - desktop tray integration on Linux, with native Ayatana support and Qt fallback;
 - configurable LOW threshold, refresh interval, notifications, and per-window usage reserves;
-- bounded local usage history with 24h/7d/30d descriptive analysis;
+- bounded 180-day local usage history with 24h/7d/30d descriptive analysis;
+- empirical Historical context at the current time-to-reset using independent prior cycles;
 - reset-credit count/details when reported by the app-server;
 - an independent reset event ledger;
 - deterministic Control/Budget information derived from the currently reported usage windows;
@@ -129,9 +130,22 @@ Reserve configuration is tied to the usage windows currently reported by the sou
 
 The reset recommendation is deterministic and based on current factual state plus configured policy. It does not use historical slope, forecasting, or predicted time-to-exhaustion.
 
+### Historical context
+
+Open Details also exposes **Historical context** for a current usage window when
+authoritative reset metadata and comparable retained cycles are available.
+
+Context compares the current remaining fraction with at most one real retained
+observation from each prior authoritative cycle at a similar time-to-reset. It
+uses the exact tolerance `min(0.05*h*, 2 hours)` and adapts presentation to the
+number of independent comparable cycles.
+
+Context is descriptive only. It does not forecast exhaustion, estimate probability
+of future usage, influence alerts, alter Control/Budget policy, or trigger redeem.
+
 ### History
 
-History stores only eligible CURRENT observations and provides read-only descriptive analysis over:
+History retains eligible CURRENT observations for 180 days and provides read-only descriptive analysis over:
 
 - 24 hours;
 - 7 days;

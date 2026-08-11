@@ -222,17 +222,52 @@ class CodexAppServerProvider:
 
 
 def parse_rate_limits_response(message: JsonObject, *, observed_at: datetime) -> UsageSnapshot:
-    """Map one `account/rateLimits/read` response into the canonical domain model."""
+    """Map one supported account/rateLimits/read shape into the canonical model.
 
+    v1.7 source selection is explicit: a structurally usable
+    ``rateLimitsByLimitId.codex`` snapshot is preferred; otherwise the supported
+    legacy ``rateLimits`` snapshot remains the compatibility fallback. Other
+    multi-bucket limit IDs are never merged into Current.
+    """
     if observed_at.tzinfo is None or observed_at.utcoffset() is None:
         raise ValueError("observed_at must be timezone-aware")
 
     result = _mapping(message.get("result"), "result")
-    rate_limits_raw = result.get("rateLimits")
-    if rate_limits_raw is None:
-        raise UsageSchemaError("result.rateLimits is missing")
-    rate_limits = _mapping(rate_limits_raw, "result.rateLimits")
+    explicit_codex = _explicit_codex_rate_limits(result)
+    legacy_raw = result.get("rateLimits")
 
+    if explicit_codex is not None:
+        try:
+            return _parse_rate_limit_snapshot(explicit_codex, observed_at=observed_at)
+        except UsageSchemaError:
+            if legacy_raw is None:
+                raise
+
+    if legacy_raw is None:
+        raise UsageSchemaError("result.rateLimits is missing")
+    legacy = _mapping(legacy_raw, "result.rateLimits")
+    return _parse_rate_limit_snapshot(legacy, observed_at=observed_at)
+
+
+def _explicit_codex_rate_limits(result: JsonObject) -> JsonObject | None:
+    buckets_raw = result.get("rateLimitsByLimitId")
+    if not isinstance(buckets_raw, dict):
+        return None
+    buckets = cast(JsonObject, buckets_raw)
+    codex_raw = buckets.get("codex")
+    if not isinstance(codex_raw, dict):
+        return None
+    codex = cast(JsonObject, codex_raw)
+    if not any(key in codex for key in ("primary", "secondary", "rateLimitReachedType")):
+        return None
+    return codex
+
+
+def _parse_rate_limit_snapshot(
+    rate_limits: JsonObject,
+    *,
+    observed_at: datetime,
+) -> UsageSnapshot:
     windows: list[UsageWindow] = []
     for slot in ("primary", "secondary"):
         raw = rate_limits.get(slot)

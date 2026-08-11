@@ -1,0 +1,14 @@
+{
+  "id": 1,
+  "result": {
+    "rateLimits": {
+      "primary": {
+        "usedPercent": 25,
+        "windowDurationMins": 300,
+        "resetsAt": 1786464000
+      },
+      "secondary": null,
+      "rateLimitReachedType": null
+    }
+  }
+}

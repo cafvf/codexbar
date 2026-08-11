@@ -4,6 +4,7 @@ import argparse
 import sys
 from decimal import Decimal
 
+from codexbar.application.diagnostics import render_doctor_json, render_doctor_text
 from codexbar.application.history import HistoryError, HistoryState
 from codexbar.application.history_runtime import HistoryCapturingUsageProvider, HistoryService
 from codexbar.application.ports import UsageProvider
@@ -12,6 +13,7 @@ from codexbar.application.settings import GetSettings, ResetSettings, SettingsLo
 from codexbar.application.use_cases import GetCurrentUsage
 from codexbar.composition import build_gui_runtime, build_usage_provider
 from codexbar.domain.errors import CodexBarError, SettingsError
+from codexbar.infrastructure.diagnostics import build_doctor_service
 from codexbar.infrastructure.history_paths import history_database_path
 from codexbar.infrastructure.history_sqlite import SqliteHistoryRepository
 from codexbar.infrastructure.settings import JsonSettingsRepository
@@ -37,6 +39,17 @@ def build_parser() -> argparse.ArgumentParser:
     )
 
     subparsers = parser.add_subparsers(dest="command")
+    doctor = subparsers.add_parser(
+        "doctor",
+        help="inspect CodexBar subsystem health without mutating local state",
+    )
+    doctor.add_argument(
+        "--json",
+        action="store_true",
+        dest="doctor_json",
+        help="emit diagnostics schema version 1 as JSON",
+    )
+
     desktop = subparsers.add_parser("desktop", help="manage user-local Linux desktop integration")
     desktop_sub = desktop.add_subparsers(dest="desktop_command", required=True)
     desktop_sub.add_parser("install", help="install the .desktop entry and project icon")
@@ -234,6 +247,12 @@ def _run_indicator_diagnostics() -> int:
     return report.exit_code or 2
 
 
+def _run_doctor(*, as_json: bool) -> int:
+    snapshot = build_doctor_service().collect()
+    print(render_doctor_json(snapshot) if as_json else render_doctor_text(snapshot))
+    return 0
+
+
 def _with_history(provider: UsageProvider) -> UsageProvider:
     try:
         repository = SqliteHistoryRepository(history_database_path())
@@ -269,6 +288,8 @@ def _print_usage(provider: UsageProvider) -> int:
 
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
+    if args.command == "doctor":
+        return _run_doctor(as_json=args.doctor_json)
     if args.command == "desktop":
         return _run_desktop(args)
     if args.command == "settings":

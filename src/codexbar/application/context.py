@@ -6,6 +6,7 @@ from typing import Protocol
 
 from codexbar.application.history import HistoryError, HistoryInterval
 from codexbar.application.history_policy import HISTORY_RETENTION
+from codexbar.application.revisions import CurrentRevision, HistoryRevision
 from codexbar.domain.context import (
     ContextCoverage,
     ContextEmpiricalSummary,
@@ -87,13 +88,87 @@ class HistoricalContextResult:
             raise ValueError("summary cycle count must match comparable cycle count")
 
 
+@dataclass(frozen=True, slots=True)
+class ContextCacheKey:
+    current_revision: CurrentRevision
+    history_revision: HistoryRevision
+    window_id: UsageWindowId
+
+
+@dataclass(frozen=True, slots=True)
+class ContextCacheStats:
+    hits: int
+    misses: int
+    entries: int
+
+
 class HistoricalContextService:
     """Compose an already-observed Current snapshot with bounded local history."""
 
     def __init__(self, repository: ContextHistoryRepository) -> None:
         self._repository = repository
+        self._cache: dict[ContextCacheKey, HistoricalContextResult] = {}
+        self._active_revision_pair: tuple[CurrentRevision, HistoryRevision] | None = None
+        self._cache_hits = 0
+        self._cache_misses = 0
+
+    @property
+    def cache_stats(self) -> ContextCacheStats:
+        return ContextCacheStats(
+            hits=self._cache_hits,
+            misses=self._cache_misses,
+            entries=len(self._cache),
+        )
+
+    def clear_cache(self, *, reset_metrics: bool = False) -> None:
+        self._cache.clear()
+        self._active_revision_pair = None
+        if reset_metrics:
+            self._cache_hits = 0
+            self._cache_misses = 0
 
     def evaluate(
+        self,
+        *,
+        current: UsageSnapshot,
+        window_id: UsageWindowId,
+        current_revision: CurrentRevision | None = None,
+        history_revision: HistoryRevision | None = None,
+    ) -> HistoricalContextResult:
+        if (current_revision is None) != (history_revision is None):
+            raise ValueError("Current and History revisions must be supplied together")
+
+        # STALE is derived from an older authoritative observation and therefore does
+        # not receive a new Current revision. It must bypass a cache entry produced
+        # while that same revision was CURRENT.
+        if current.freshness is not Freshness.CURRENT:
+            return self._evaluate_uncached(current=current, window_id=window_id)
+
+        if current_revision is None or history_revision is None:
+            return self._evaluate_uncached(current=current, window_id=window_id)
+
+        pair = (current_revision, history_revision)
+        if pair != self._active_revision_pair:
+            self._cache.clear()
+            self._active_revision_pair = pair
+
+        key = ContextCacheKey(
+            current_revision=current_revision,
+            history_revision=history_revision,
+            window_id=window_id,
+        )
+        cached = self._cache.get(key)
+        if cached is not None:
+            self._cache_hits += 1
+            return cached
+
+        self._cache_misses += 1
+        result = self._evaluate_uncached(current=current, window_id=window_id)
+        if result.reason is not HistoricalContextReason.HISTORY_UNAVAILABLE:
+            self._cache[key] = result
+        return result
+
+    def _evaluate_uncached(
         self,
         *,
         current: UsageSnapshot,

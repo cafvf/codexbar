@@ -287,7 +287,7 @@ class SqliteHistoryRepository(HistoryRepository):
             f"cannot {operation} history database: {exc}"
         ) from exc
 
-    def append(self, snapshot: HistoricalSnapshot) -> None:
+    def append(self, snapshot: HistoricalSnapshot) -> bool:
         try:
             with self._connect() as connection:
                 cursor = connection.execute(
@@ -308,7 +308,7 @@ class SqliteHistoryRepository(HistoryRepository):
                     ),
                 )
                 if cursor.rowcount == 0:
-                    return
+                    return False
                 snapshot_id = cursor.lastrowid
                 if snapshot_id is None:
                     raise sqlite3.DatabaseError("missing snapshot id after insert")
@@ -338,6 +338,7 @@ class SqliteHistoryRepository(HistoryRepository):
                         for window in snapshot.windows
                     ],
                 )
+                return True
         except ValueError as exc:
             raise HistoryWriteError(f"cannot append history snapshot: {exc}") from exc
         except sqlite3.DatabaseError as exc:
@@ -589,10 +590,11 @@ class SqliteHistoryRepository(HistoryRepository):
                 ) from exc
             raise HistoryReadError(f"cannot inspect history: {exc}") from exc
 
-    def clear(self) -> None:
+    def clear(self) -> int:
         try:
             with self._connect() as connection:
-                connection.execute("DELETE FROM snapshots")
+                cursor = connection.execute("DELETE FROM snapshots")
+                return cursor.rowcount
         except sqlite3.DatabaseError as exc:
             if _is_corruption_error(exc):
                 raise HistoryCorruptionError(

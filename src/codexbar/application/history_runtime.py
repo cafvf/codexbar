@@ -11,6 +11,7 @@ from codexbar.application.history import (
 )
 from codexbar.application.history_policy import HISTORY_RETENTION
 from codexbar.application.ports import UsageProvider
+from codexbar.application.revisions import HistoryRevision
 from codexbar.domain.models import Freshness, UsageSnapshot
 
 
@@ -33,24 +34,33 @@ class HistoryService:
         self._repository = repository
         self._clock = clock or (lambda: datetime.now(UTC))
         self._last_result = HistoryMaintenanceResult(captured=False)
+        self._revision = HistoryRevision()
 
     @property
     def last_result(self) -> HistoryMaintenanceResult:
         return self._last_result
+
+    @property
+    def revision(self) -> HistoryRevision:
+        return self._revision
 
     def process(self, snapshot: UsageSnapshot) -> HistoryMaintenanceResult:
         if snapshot.freshness is not Freshness.CURRENT:
             self._last_result = HistoryMaintenanceResult(captured=False)
             return self._last_result
 
+        historical = HistoricalSnapshot.from_usage_snapshot(snapshot)
         try:
-            self._repository.append(HistoricalSnapshot.from_usage_snapshot(snapshot))
+            appended = self._repository.append(historical)
         except HistoryError as exc:
             self._last_result = HistoryMaintenanceResult(
                 captured=False,
                 diagnostic=exc,
             )
             return self._last_result
+
+        if appended:
+            self._advance_revision()
 
         try:
             pruned = self._repository.prune(self._cutoff())
@@ -61,11 +71,24 @@ class HistoryService:
             )
             return self._last_result
 
+        if pruned > 0:
+            self._advance_revision()
+
         self._last_result = HistoryMaintenanceResult(
             captured=True,
             pruned_count=pruned,
         )
         return self._last_result
+
+    def clear(self) -> int:
+        """Clear History and advance the runtime revision only when rows existed."""
+        removed = self._repository.clear()
+        if removed > 0:
+            self._advance_revision()
+        return removed
+
+    def _advance_revision(self) -> None:
+        self._revision = self._revision.next()
 
     def _cutoff(self) -> datetime:
         now = self._clock()

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
 from decimal import Decimal
 from enum import StrEnum
@@ -11,6 +12,7 @@ from codexbar.application.context import (
     HistoricalContextService,
     HistoricalContextState,
 )
+from codexbar.application.revisions import HistoryRevision
 from codexbar.domain.context import ContextCoverage, ContextRank
 from codexbar.domain.models import UsageWindowId
 
@@ -50,9 +52,12 @@ class ContextPresenter:
         self,
         latest_reader: LatestAccountObservationReader,
         service: HistoricalContextService,
+        *,
+        history_revision_reader: Callable[[], HistoryRevision] | None = None,
     ) -> None:
         self._latest_reader = latest_reader
         self._service = service
+        self._history_revision_reader = history_revision_reader
 
     def current(self) -> ContextViewState:
         observation = self._latest_reader.latest
@@ -63,13 +68,31 @@ class ContextPresenter:
             tuple(
                 self._window_state(
                     label=window.label,
-                    result=self._service.evaluate(
-                        current=observation.usage,
-                        window_id=window.id,
-                    ),
+                    result=self._evaluate_window(window.id),
                 )
                 for window in observation.usage.windows
             )
+        )
+
+    def _evaluate_window(self, window_id: UsageWindowId) -> HistoricalContextResult:
+        observation = self._latest_reader.latest
+        if observation is None:
+            raise AssertionError("Context evaluation requires a latest observation")
+
+        revision_reader = self._history_revision_reader
+        if revision_reader is None:
+            # Preserve the v1.6 presenter construction contract for unit callers that
+            # do not participate in the v1.7 runtime revision model.
+            return self._service.evaluate(
+                current=observation.usage,
+                window_id=window_id,
+            )
+
+        return self._service.evaluate(
+            current=observation.usage,
+            window_id=window_id,
+            current_revision=self._latest_reader.current_revision,
+            history_revision=revision_reader(),
         )
 
     @staticmethod

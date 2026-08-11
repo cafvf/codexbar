@@ -26,6 +26,7 @@ from codexbar.application.reset_ledger import (
 )
 from codexbar.application.reset_ledger_service import ResetLedgerService
 from codexbar.application.reset_projection import ResetLedgerProjection
+from codexbar.application.revisions import HistoryRevision
 from codexbar.application.settings import GetSettings, SettingsRepository
 from codexbar.application.usage_adapter import AccountUsageProvider
 from codexbar.infrastructure.account_reader import CodexAccountRateLimitsReader
@@ -139,6 +140,15 @@ def _projection_provider(
     return service.projection if service is not None else _unavailable_reset_projection
 
 
+def _history_revision_reader(
+    service: HistoryService | None,
+) -> Callable[[], HistoryRevision]:
+    if service is None:
+        return lambda: HistoryRevision()
+    history_service = service
+    return lambda: history_service.revision
+
+
 def _account_adapters(
     *,
     mock: bool,
@@ -181,7 +191,11 @@ def build_gui_runtime(*, mock: bool = False) -> GuiRuntime:
         _projection_provider(reset.service),
         redeem_manager=redeem_manager,
     )
-    context_presenter = ContextPresenter(latest_reader, history.context_service)
+    context_presenter = ContextPresenter(
+        latest_reader,
+        history.context_service,
+        history_revision_reader=_history_revision_reader(history.service),
+    )
 
     return GuiRuntime(
         provider=AccountUsageProvider(coordinated_reader),

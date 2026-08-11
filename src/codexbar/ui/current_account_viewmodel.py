@@ -2,20 +2,22 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import UTC, datetime
 from enum import StrEnum
-from typing import TYPE_CHECKING
 
 from codexbar.application.account import AccountRateLimitsObservation
 from codexbar.application.account_presentation import LatestAccountObservationReader
 from codexbar.application.budget import BudgetRuntime, WindowBudget
 from codexbar.application.redeem import RedeemAttempt, RedeemProcessManager
+from codexbar.application.reset_ledger import ResetLedgerError
 from codexbar.application.reset_monitor import (
+    OpportunityPriority,
     ResetAdvice,
     ResetOpportunityPolicy,
     build_reset_situation,
 )
 from codexbar.application.reset_projection import ResetLedgerProjection
+from codexbar.domain.models import Freshness
 from codexbar.domain.reset import (
     DetailCoverage,
     ExpiryKind,
@@ -24,9 +26,6 @@ from codexbar.domain.reset import (
 )
 from codexbar.domain.settings import AppSettings
 from codexbar.ui.viewmodel import UsageViewModel, UsageViewState
-
-if TYPE_CHECKING:
-    from codexbar.ui.context_viewmodel import ContextPresenter
 
 
 class ResetCurrentKind(StrEnum):
@@ -75,6 +74,13 @@ ProjectionProvider = Callable[[], ResetLedgerProjection]
 Clock = Callable[[], datetime]
 
 
+def _withheld_control_advice() -> ResetAdvice:
+    return ResetAdvice(
+        OpportunityPriority.NONE,
+        "reset ledger unavailable; control advice is withheld",
+    )
+
+
 class CurrentAccountPresenter:
     def __init__(
         self,
@@ -90,8 +96,7 @@ class CurrentAccountPresenter:
         self._projection_provider = projection_provider
         self._redeem_manager = redeem_manager
         self._policy = ResetOpportunityPolicy()
-        self._clock = clock or datetime.now
-        self.context_presenter: ContextPresenter | None = None
+        self._clock = clock or (lambda: datetime.now(UTC))
 
     def apply_settings(self, settings: AppSettings) -> None:
         self._budget_runtime.apply_settings(settings)
@@ -101,36 +106,74 @@ class CurrentAccountPresenter:
         if observation is None:
             return None
 
-        projection = self._projection_provider()
+        projection, ledger_available = self._projection()
+        unresolved, ledger_available = self._unresolved_attempts(ledger_available)
+        budget = self._budget_view(observation, projection, ledger_available)
+        redeem_available = (
+            self._redeem_manager is not None
+            and ledger_available
+            and observation.usage.freshness is Freshness.CURRENT
+        )
+        return CurrentAccountViewState(
+            usage=UsageViewModel.from_snapshot(observation.usage),
+            reset=_reset_view(observation),
+            budget=budget,
+            redeem=RedeemActionViewState(
+                available=redeem_available,
+                unresolved=unresolved,
+            ),
+        )
+
+    def _projection(self) -> tuple[ResetLedgerProjection, bool]:
+        try:
+            return self._projection_provider(), True
+        except ResetLedgerError:
+            return ResetLedgerProjection(), False
+
+    def _unresolved_attempts(
+        self,
+        ledger_available: bool,
+    ) -> tuple[tuple[RedeemAttempt, ...], bool]:
+        manager = self._redeem_manager
+        if manager is None or not ledger_available:
+            return (), ledger_available
+        try:
+            return manager.unresolved_attempts(), True
+        except ResetLedgerError:
+            return (), False
+
+    def _budget_view(
+        self,
+        observation: AccountRateLimitsObservation,
+        projection: ResetLedgerProjection,
+        ledger_available: bool,
+    ) -> BudgetViewState:
+        if observation.usage.freshness is not Freshness.CURRENT:
+            return BudgetViewState(
+                (),
+                ResetAdvice(
+                    OpportunityPriority.NONE,
+                    "usage is not current; control and budget are withheld",
+                ),
+            )
+
         situation = build_reset_situation(
             observation,
             self._budget_runtime,
             projection,
         )
-        advice = self._policy.assess(
-            situation,
-            now=self._aware_now(observation),
+        advice = (
+            self._policy.assess(situation, now=self._aware_now())
+            if ledger_available
+            else _withheld_control_advice()
         )
-        unresolved = (
-            self._redeem_manager.unresolved_attempts()
-            if self._redeem_manager is not None
-            else ()
-        )
-        return CurrentAccountViewState(
-            usage=UsageViewModel.from_snapshot(observation.usage),
-            reset=_reset_view(observation),
-            budget=BudgetViewState(situation.budgets, advice),
-            redeem=RedeemActionViewState(
-                available=self._redeem_manager is not None,
-                unresolved=unresolved,
-            ),
-        )
+        return BudgetViewState(situation.budgets, advice)
 
-    def _aware_now(self, observation: AccountRateLimitsObservation) -> datetime:
+    def _aware_now(self) -> datetime:
         value = self._clock()
         if value.tzinfo is None or value.utcoffset() is None:
-            return observation.usage.observed_at
-        return value
+            raise ValueError("current-account presenter clock must be timezone-aware")
+        return value.astimezone(UTC)
 
 
 def _reset_view(observation: AccountRateLimitsObservation) -> ResetCurrentViewState:

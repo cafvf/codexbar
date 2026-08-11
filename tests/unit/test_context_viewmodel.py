@@ -120,7 +120,10 @@ def test_task_654_limited_state_exposes_median_range_and_rank() -> None:
     assert window.median == Decimal("0.40")
     assert window.range_low == Decimal("0.20")
     assert window.range_high == Decimal("0.60")
-    assert window.rank_text == "Historical comparison: 3 greater, 0 equal, 2 lower."
+    assert window.rank_text == (
+        "Historical comparison: 3 historical values greater than current, "
+        "0 equal to current, 2 lower than current."
+    )
 
 
 def test_task_655_656_established_state_exposes_middle_50_and_explicit_ties() -> None:
@@ -134,4 +137,7 @@ def test_task_655_656_established_state_exposes_middle_50_and_explicit_ties() ->
     assert window.median == Decimal("0.375")
     assert window.band_low == Decimal("0.3125")
     assert window.band_high == Decimal("0.575")
-    assert window.rank_text == "Historical comparison: 5 greater, 2 equal, 3 lower."
+    assert window.rank_text == (
+        "Historical comparison: 5 historical values greater than current, "
+        "2 equal to current, 3 lower than current."
+    )

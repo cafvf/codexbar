@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from codexbar.application.account import AccountRateLimitsObservation, AccountRateLimitsReader
-from codexbar.domain.errors import UsageSourceError
+from codexbar.domain.errors import UsageError
 from codexbar.domain.reset import ResetCreditReadResult
 
 
@@ -19,7 +19,7 @@ class CurrentAccountController:
     def refresh(self) -> AccountRateLimitsObservation:
         try:
             observation = self._reader.read_account_rate_limits()
-        except UsageSourceError:
+        except UsageError:
             if self._last_valid is None:
                 raise
             return AccountRateLimitsObservation(

@@ -2,17 +2,16 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import dataclass
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime
 
 from codexbar.application.history import (
     HistoricalSnapshot,
     HistoryError,
     HistoryRepository,
 )
+from codexbar.application.history_policy import HISTORY_RETENTION
 from codexbar.application.ports import UsageProvider
 from codexbar.domain.models import Freshness, UsageSnapshot
-
-HISTORY_RETENTION = timedelta(days=180)
 
 
 @dataclass(frozen=True, slots=True)

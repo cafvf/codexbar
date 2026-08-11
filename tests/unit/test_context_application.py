@@ -106,10 +106,10 @@ def test_task_644_missing_current_window_and_reset_are_explicit() -> None:
 
     assert missing_window.state is HistoricalContextState.UNAVAILABLE
     assert missing_window.reason is HistoricalContextReason.CURRENT_WINDOW_MISSING
-    assert missing_window.comparable_cycle_count == 0
+    assert missing_window.comparable_cycle_count is None
     assert missing_reset.state is HistoricalContextState.UNAVAILABLE
     assert missing_reset.reason is HistoricalContextReason.CURRENT_RESET_MISSING
-    assert missing_reset.comparable_cycle_count == 0
+    assert missing_reset.comparable_cycle_count is None
     assert repository.calls == []
 
 

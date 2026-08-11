@@ -8,10 +8,23 @@ import sqlite3
 import statistics
 import tempfile
 import time
+from collections.abc import Callable
 from dataclasses import asdict, dataclass
 from datetime import UTC, datetime, timedelta
+from decimal import Decimal
 from pathlib import Path
 from typing import Any
+
+from codexbar.application.context import HistoricalContextService
+from codexbar.domain.models import (
+    Fraction,
+    UsageSnapshot,
+    UsageSource,
+    UsageWindow,
+    UsageWindowId,
+)
+from codexbar.infrastructure.context_history import SqliteContextHistoryRepository
+from codexbar.infrastructure.history_sqlite import SqliteHistoryRepository
 
 SCHEMA_VERSION = 1
 DEFAULT_DAYS = 180
@@ -75,6 +88,7 @@ class CharacterizationReport:
     history_30d_query: TimingSummary
     window_180d_query: TimingSummary
     context_candidate_query: TimingSummary
+    production_context_summary: TimingSummary
     query_plans: dict[str, list[str]]
     index_decision: str
 
@@ -184,6 +198,9 @@ def create_fixture(path: Path, *, days: int, poll_minutes: int) -> FixtureSummar
         )
         connection.execute("ANALYZE")
 
+    # The fixture uses fast bulk insertion, then opens it through the production
+    # repository so characterization and runtime share one schema authority.
+    SqliteHistoryRepository(path)
     database_bytes = path.stat().st_size
     snapshots = len(snapshot_rows)
     windows = len(window_rows)
@@ -235,6 +252,22 @@ def benchmark(
     )
 
 
+def benchmark_callable(operation: Callable[[], object], repeats: int) -> TimingSummary:
+    operation()
+    timings: list[float] = []
+    for _ in range(repeats):
+        start = time.perf_counter_ns()
+        operation()
+        timings.append((time.perf_counter_ns() - start) / 1_000_000)
+    return TimingSummary(
+        repeats=repeats,
+        median_ms=statistics.median(timings),
+        p95_ms=percentile_linear(timings, 0.95),
+        min_ms=min(timings),
+        max_ms=max(timings),
+    )
+
+
 def explain(connection: sqlite3.Connection, sql: str, params: tuple[Any, ...]) -> list[str]:
     rows = connection.execute(f"EXPLAIN QUERY PLAN {sql}", params).fetchall()
     return [str(row[3]) for row in rows]
@@ -277,6 +310,27 @@ def characterize(path: Path, *, fixture: FixtureSummary, repeats: int) -> Charac
             "context_candidate": explain(connection, candidate_sql, candidate_params),
         }
 
+    repository = SqliteHistoryRepository(path)
+    context_service = HistoricalContextService(SqliteContextHistoryRepository(repository))
+    current_reset = _next_boundary(FIXTURE_END, timedelta(hours=8))
+    current_window = UsageWindowId("context_primary")
+    current = UsageSnapshot(
+        windows=(
+            UsageWindow(
+                current_window,
+                "Primary context window",
+                Fraction(Decimal(_remaining_fraction(FIXTURE_END, current_reset, 8 * 3600))),
+                resets_at=current_reset,
+            ),
+        ),
+        observed_at=FIXTURE_END,
+        source=UsageSource.MOCK,
+    )
+    production_context = benchmark_callable(
+        lambda: context_service.evaluate(current=current, window_id=current_window),
+        repeats,
+    )
+
     decision = (
         "Retain schema v1 and existing indexes for Phase A. The candidate Context query is "
         "characterized but no speculative index is added; index changes remain evidence-driven."
@@ -287,6 +341,7 @@ def characterize(path: Path, *, fixture: FixtureSummary, repeats: int) -> Charac
         history_30d_query=history,
         window_180d_query=window,
         context_candidate_query=candidate,
+        production_context_summary=production_context,
         query_plans=plans,
         index_decision=decision,
     )
@@ -297,7 +352,8 @@ def markdown_report(report: CharacterizationReport) -> str:
     timing_rows = [
         ("History window 30d", report.history_30d_query),
         ("Window 180d", report.window_180d_query),
-        ("Context candidate 180d", report.context_candidate_query),
+        ("Context candidate SQL 180d", report.context_candidate_query),
+        ("Production HistoricalContextService", report.production_context_summary),
     ]
     timing_table = "\n".join(
         f"| {label} | {timing.median_ms:.3f} | {timing.p95_ms:.3f} | "

@@ -35,9 +35,11 @@ def test_task_640_application_context_has_no_infrastructure_or_ui_dependency() -
     assert "sqlite3" not in modules
 
 
-def test_task_649_composition_root_wires_context_service_through_adapter() -> None:
+def test_task_649_composition_root_wires_context_through_history_runtime() -> None:
     source = COMPOSITION.read_text(encoding="utf-8")
 
     assert "HistoricalContextService" in source
     assert "SqliteContextHistoryRepository" in source
-    assert "context_service=context_service" in source
+    assert "_build_history_runtime" in source
+    assert "context_presenter = ContextPresenter" in source
+    assert "CurrentAccountController" not in source

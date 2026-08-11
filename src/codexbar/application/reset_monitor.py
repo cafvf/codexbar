@@ -57,10 +57,7 @@ def build_reset_situation(
     budget_runtime: BudgetRuntime,
     projection: ResetLedgerProjection,
 ) -> ResetSituation:
-    budgets = tuple(
-        budget_runtime.assess(window)
-        for window in observation.usage.windows
-    )
+    budgets = tuple(budget_runtime.assess(window) for window in observation.usage.windows)
 
     known_details: tuple[ResetCreditDetail, ...]
     if (
@@ -91,31 +88,9 @@ class ResetOpportunityPolicy:
                 "an unresolved redeem attempt requires recovery",
             )
 
-        expiring = [
-            detail
-            for detail in situation.known_details
-            if detail.expiry.kind is ExpiryKind.EXPIRES_AT
-            and detail.expiry.instant is not None
-        ]
-        nearest = min(
-            (
-                detail.expiry.instant - now
-                for detail in expiring
-                if detail.expiry.instant is not None
-            ),
-            default=None,
-        )
-
-        meaningful = any(
-            budget.status is BudgetStatus.ABOVE_RESERVE
-            and budget.headroom.percent >= MEANINGFUL_HEADROOM_POINTS
-            for budget in situation.budgets
-        )
-        scheduled_reset_near = any(
-            window.resets_at is not None
-            and timedelta(0) <= window.resets_at - now <= SCHEDULED_RESET_NEAR
-            for window in situation.observation.usage.windows
-        )
+        nearest = _nearest_upcoming_expiry(situation.known_details, now)
+        meaningful = _has_meaningful_headroom(situation.budgets)
+        scheduled_reset_near = _has_near_scheduled_reset(situation, now)
 
         if nearest is not None and nearest <= URGENT_HORIZON:
             return ResetAdvice(
@@ -135,6 +110,36 @@ class ResetOpportunityPolicy:
         return ResetAdvice(OpportunityPriority.NONE, "no current reset opportunity signal")
 
 
+def _nearest_upcoming_expiry(
+    details: tuple[ResetCreditDetail, ...],
+    now: datetime,
+) -> timedelta | None:
+    remaining = (
+        detail.expiry.instant - now
+        for detail in details
+        if detail.expiry.kind is ExpiryKind.EXPIRES_AT
+        and detail.expiry.instant is not None
+        and detail.expiry.instant >= now
+    )
+    return min(remaining, default=None)
+
+
+def _has_meaningful_headroom(budgets: tuple[WindowBudget, ...]) -> bool:
+    return any(
+        budget.status is BudgetStatus.ABOVE_RESERVE
+        and budget.headroom.percent >= MEANINGFUL_HEADROOM_POINTS
+        for budget in budgets
+    )
+
+
+def _has_near_scheduled_reset(situation: ResetSituation, now: datetime) -> bool:
+    return any(
+        window.resets_at is not None
+        and timedelta(0) <= window.resets_at - now <= SCHEDULED_RESET_NEAR
+        for window in situation.observation.usage.windows
+    )
+
+
 class ResetExpiryMonitor:
     def __init__(self) -> None:
         self._seen: set[str] = set()
@@ -147,6 +152,8 @@ class ResetExpiryMonitor:
         *,
         now: datetime,
     ) -> tuple[ResetFact, ...]:
+        if now.tzinfo is None or now.utcoffset() is None:
+            raise ValueError("monitor clock must be timezone-aware")
         facts: list[ResetFact] = []
 
         result = situation.observation.reset_credits

@@ -1,6 +1,6 @@
 from codexbar.application.use_cases import GetCurrentUsage, GetUsageQuery
 from codexbar.domain.errors import UsageSourceError
-from codexbar.domain.models import UsageSnapshot
+from codexbar.domain.models import Freshness, UsageSnapshot
 
 
 class RefreshCoordinator:
@@ -15,5 +15,11 @@ class RefreshCoordinator:
             if self._last_valid is None:
                 raise
             return self._last_valid.as_stale()
+        return self.accept_snapshot(snapshot)
+
+    def accept_snapshot(self, snapshot: UsageSnapshot) -> UsageSnapshot:
+        """Adopt an externally obtained authoritative CURRENT snapshot."""
+        if snapshot.freshness is not Freshness.CURRENT:
+            raise ValueError("only CURRENT snapshots may become the refresh fallback")
         self._last_valid = snapshot
         return snapshot

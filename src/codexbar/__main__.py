@@ -37,11 +37,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
 
     subparsers = parser.add_subparsers(dest="command")
-
-    desktop = subparsers.add_parser(
-        "desktop",
-        help="manage user-local Linux desktop integration",
-    )
+    desktop = subparsers.add_parser("desktop", help="manage user-local Linux desktop integration")
     desktop_sub = desktop.add_subparsers(dest="desktop_command", required=True)
     desktop_sub.add_parser("install", help="install the .desktop entry and project icon")
     desktop_sub.add_parser("status", help="show desktop integration status")
@@ -74,15 +70,8 @@ def build_parser() -> argparse.ArgumentParser:
         "reset-ledger",
         help="inspect persistent reset-credit evidence storage",
     )
-    reset_ledger_sub = reset_ledger.add_subparsers(
-        dest="reset_ledger_command",
-        required=True,
-    )
-    reset_ledger_sub.add_parser(
-        "inspect",
-        help="inspect local reset-credit event ledger",
-    )
-
+    reset_ledger_sub = reset_ledger.add_subparsers(dest="reset_ledger_command", required=True)
+    reset_ledger_sub.add_parser("inspect", help="inspect local reset-credit event ledger")
     return parser
 
 
@@ -107,17 +96,13 @@ def _print_settings(result: SettingsLoadResult) -> None:
     else:
         print("Usage reserves:")
         for entry in settings.usage_reserves.entries:
-            print(
-                f"  {entry.window_id.value}: "
-                f"{_format_percent(entry.reserve.value)}%"
-            )
+            print(f"  {entry.window_id.value}: {_format_percent(entry.reserve.value)}%")
     if result.diagnostic is not None:
         print(f"Diagnostic: {result.diagnostic}")
 
 
 def _run_settings(command: str) -> int:
     repository = JsonSettingsRepository()
-
     try:
         if command == "show":
             _print_settings(GetSettings(repository).execute())
@@ -129,14 +114,12 @@ def _run_settings(command: str) -> int:
     except SettingsError as exc:
         print(f"CodexBar: {exc}", file=sys.stderr)
         return 2
-
     raise AssertionError(f"unsupported settings command: {command}")
 
 
 def _print_history_inspection() -> int:
     path = history_database_path()
     inspection = SqliteHistoryRepository.inspect_path(path)
-
     print(f"Path: {inspection.path}")
     print(f"State: {inspection.state.value}")
     if inspection.schema_version is not None:
@@ -149,18 +132,12 @@ def _print_history_inspection() -> int:
         print(f"Newest: {inspection.newest_observed_at.isoformat()}")
     if inspection.diagnostic is not None:
         print(f"Diagnostic: {inspection.diagnostic}")
-
-    return (
-        2
-        if inspection.state in {HistoryState.UNREADABLE, HistoryState.UNSUPPORTED}
-        else 0
-    )
+    return 2 if inspection.state in {HistoryState.UNREADABLE, HistoryState.UNSUPPORTED} else 0
 
 
 def _clear_history() -> int:
     path = history_database_path()
     inspection = SqliteHistoryRepository.inspect_path(path)
-
     if inspection.state is HistoryState.ABSENT:
         print("History already empty (database absent).")
         return 0
@@ -171,13 +148,11 @@ def _clear_history() -> int:
             file=sys.stderr,
         )
         return 2
-
     try:
         SqliteHistoryRepository(path).clear()
     except HistoryError as exc:
         print(f"CodexBar: {exc}", file=sys.stderr)
         return 2
-
     print("Usage history cleared.")
     return 0
 
@@ -232,7 +207,6 @@ def _run_desktop(args: argparse.Namespace) -> int:
     except DesktopIntegrationError as exc:
         print(f"CodexBar: {exc}", file=sys.stderr)
         return 2
-
     raise AssertionError("unsupported desktop command")
 
 
@@ -295,23 +269,16 @@ def _print_usage(provider: UsageProvider) -> int:
 
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
-
     if args.command == "desktop":
         return _run_desktop(args)
-
     if args.command == "settings":
         return _run_settings(args.settings_command)
-
     if args.command == "history":
         return _run_history(args.history_command)
-
     if args.command == "reset-ledger":
         if args.reset_ledger_command == "inspect":
             return print_reset_ledger_inspection()
-        raise AssertionError(
-            f"unsupported reset-ledger command: {args.reset_ledger_command}"
-        )
-
+        raise AssertionError(f"unsupported reset-ledger command: {args.reset_ledger_command}")
     if args.diagnose_indicator:
         return _run_indicator_diagnostics()
 
@@ -328,6 +295,7 @@ def main(argv: list[str] | None = None) -> int:
                     history_controller=runtime.history_controller,
                     presenter=runtime.presenter,
                     redeem_manager=runtime.redeem_manager,
+                    context_presenter=runtime.context_presenter,
                 )
             finally:
                 runtime.close()

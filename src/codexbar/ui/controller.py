@@ -6,7 +6,6 @@ from enum import StrEnum
 from typing import Final, Protocol
 
 from codexbar.application.alerts import AlertService
-from codexbar.application.refresh import RefreshCoordinator
 from codexbar.domain.errors import CodexBarError
 from codexbar.domain.models import DEFAULT_USAGE_POLICY, UsagePolicy, UsageSnapshot
 from codexbar.domain.settings import AppSettings
@@ -39,6 +38,12 @@ class IntervalTimer(Protocol):
     def setInterval(self, milliseconds: int) -> None: ...
 
 
+class RefreshCoordinatorPort(Protocol):
+    def refresh(self) -> UsageSnapshot: ...
+
+    def accept_snapshot(self, snapshot: UsageSnapshot) -> UsageSnapshot: ...
+
+
 def apply_refresh_interval(timer: IntervalTimer, settings: AppSettings) -> None:
     timer.setInterval(settings.refresh_interval_seconds.value * 1000)
 
@@ -55,7 +60,7 @@ class TrayController:
 
     def __init__(
         self,
-        coordinator: RefreshCoordinator,
+        coordinator: RefreshCoordinatorPort,
         executor: Executor | None = None,
         usage_policy: UsagePolicy = DEFAULT_USAGE_POLICY,
         alert_service: AlertService | None = None,
@@ -70,6 +75,9 @@ class TrayController:
         self._alert_service = alert_service
         self._notifications_enabled = notifications_enabled
         self._future: Future[UsageSnapshot] | None = None
+        self._future_generation: int | None = None
+        self._generation = 0
+        self._active_generation = 0
         self._state = TrayViewState(phase=TrayPhase.LOADING)
 
     @property
@@ -89,12 +97,15 @@ class TrayController:
     def start_refresh(self) -> bool:
         if self.busy:
             return False
+        self._generation += 1
+        self._active_generation = self._generation
         self._state = TrayViewState(
             phase=TrayPhase.LOADING,
             usage=self._state.usage,
             message=None,
         )
         self._future = self._executor.submit(self._coordinator.refresh)
+        self._future_generation = self._generation
         return True
 
     def poll(self) -> TrayViewState:
@@ -102,24 +113,38 @@ class TrayController:
         if future is None or not future.done():
             return self._state
 
+        completed_generation = self._future_generation
         self._future = None
+        self._future_generation = None
         try:
             snapshot = future.result()
         except CodexBarError as exc:
+            if completed_generation != self._active_generation:
+                return self._state
             self._state = TrayViewState(
                 phase=TrayPhase.ERROR,
                 usage=self._state.usage,
                 message=str(exc),
             )
             return self._state
+        if completed_generation != self._active_generation:
+            return self._state
+        return self._state_from_snapshot(snapshot)
 
+    def adopt_snapshot(self, snapshot: UsageSnapshot) -> TrayViewState:
+        """Adopt CURRENT state and invalidate an older in-flight refresh result."""
+        self._generation += 1
+        self._active_generation = self._generation
+        self._coordinator.accept_snapshot(snapshot)
+        return self._state_from_snapshot(snapshot)
+
+    def _state_from_snapshot(self, snapshot: UsageSnapshot) -> TrayViewState:
         if self._alert_service is not None:
             self._alert_service.process(
                 snapshot,
                 self._usage_policy,
                 notifications_enabled=self._notifications_enabled,
             )
-
         usage = UsageViewModel.from_snapshot(snapshot, self._usage_policy)
         phase = TrayPhase.STALE if usage.stale else TrayPhase.FRESH
         self._state = TrayViewState(phase=phase, usage=usage)

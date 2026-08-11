@@ -1,21 +1,20 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import timedelta
 from enum import StrEnum
 from typing import Protocol
 
 from codexbar.application.history import HistoryError, HistoryInterval
+from codexbar.application.history_policy import HISTORY_RETENTION
 from codexbar.domain.context import (
+    ContextCoverage,
     ContextEmpiricalSummary,
     ContextObservation,
     ContextSelectionState,
     select_context_references,
     summarize_context_reference_set,
 )
-from codexbar.domain.models import UsageSnapshot, UsageWindowId
-
-_CONTEXT_HISTORY_RETENTION = timedelta(days=180)
+from codexbar.domain.models import Freshness, UsageSnapshot, UsageWindowId
 
 
 class ContextHistoryRepository(Protocol):
@@ -28,6 +27,20 @@ class ContextHistoryRepository(Protocol):
     ) -> tuple[ContextObservation, ...]: ...
 
 
+class FailedContextHistoryRepository:
+    """Read port preserving an already-normalized history failure."""
+
+    def __init__(self, error: HistoryError) -> None:
+        self._error = error
+
+    def query_candidates(
+        self,
+        window_id: UsageWindowId,
+        interval: HistoryInterval,
+    ) -> tuple[ContextObservation, ...]:
+        raise self._error
+
+
 class HistoricalContextState(StrEnum):
     UNAVAILABLE = "unavailable"
     INSUFFICIENT = "insufficient"
@@ -36,6 +49,7 @@ class HistoricalContextState(StrEnum):
 
 class HistoricalContextReason(StrEnum):
     CURRENT_WINDOW_MISSING = "current_window_missing"
+    CURRENT_NOT_CURRENT = "current_not_current"
     CURRENT_RESET_MISSING = "current_reset_missing"
     CURRENT_RESET_INVALID = "current_reset_invalid"
     NO_HISTORICAL_OBSERVATIONS = "no_historical_observations"
@@ -59,14 +73,12 @@ class HistoricalContextResult:
     def __post_init__(self) -> None:
         if self.comparable_cycle_count is not None and self.comparable_cycle_count < 0:
             raise ValueError("comparable cycle count must not be negative")
-        if self.state is HistoricalContextState.SUFFICIENT and self.summary is None:
-            raise ValueError("sufficient context requires a summary")
-        if self.state is not HistoricalContextState.SUFFICIENT and self.summary is not None:
-            raise ValueError("non-sufficient context must not expose a summary")
-        if self.state is HistoricalContextState.SUFFICIENT and self.reason is not None:
-            raise ValueError("sufficient context must not expose an absence reason")
-        if self.state is not HistoricalContextState.SUFFICIENT and self.reason is None:
-            raise ValueError("non-sufficient context requires an explicit reason")
+
+        if self.state is HistoricalContextState.SUFFICIENT:
+            if self.summary is None or self.reason is not None:
+                raise ValueError("sufficient context requires summary and no absence reason")
+        elif self.summary is not None or self.reason is None:
+            raise ValueError("non-sufficient context requires an absence reason and no summary")
         if (
             self.summary is not None
             and self.comparable_cycle_count is not None
@@ -87,12 +99,19 @@ class HistoricalContextService:
         current: UsageSnapshot,
         window_id: UsageWindowId,
     ) -> HistoricalContextResult:
+        if current.freshness is not Freshness.CURRENT:
+            return self._unavailable(
+                window_id,
+                HistoricalContextReason.CURRENT_NOT_CURRENT,
+                comparable_cycle_count=None,
+            )
+
         window = next((item for item in current.windows if item.id == window_id), None)
         if window is None:
             return self._unavailable(
                 window_id,
                 HistoricalContextReason.CURRENT_WINDOW_MISSING,
-                comparable_cycle_count=0,
+                comparable_cycle_count=None,
             )
 
         current_observation = ContextObservation(
@@ -106,17 +125,17 @@ class HistoricalContextService:
             return self._unavailable(
                 window_id,
                 HistoricalContextReason.CURRENT_RESET_MISSING,
-                comparable_cycle_count=0,
+                comparable_cycle_count=None,
             )
         if window.resets_at < current.observed_at:
             return self._unavailable(
                 window_id,
                 HistoricalContextReason.CURRENT_RESET_INVALID,
-                comparable_cycle_count=0,
+                comparable_cycle_count=None,
             )
 
         interval = HistoryInterval(
-            current.observed_at - _CONTEXT_HISTORY_RETENTION,
+            current.observed_at - HISTORY_RETENTION,
             current.observed_at,
         )
         try:
@@ -145,7 +164,7 @@ class HistoricalContextService:
             current_remaining=window.remaining,
             reference_set=reference_set,
         )
-        if summary.coverage.value == "insufficient":
+        if summary.coverage is ContextCoverage.INSUFFICIENT:
             return HistoricalContextResult(
                 window_id=window_id,
                 state=HistoricalContextState.INSUFFICIENT,
@@ -195,8 +214,16 @@ class HistoricalContextService:
         reason = reasons.get(state)
         if reason is None:
             raise ValueError(f"unsupported context selection state: {state}")
+        count = (
+            None
+            if state in {
+                ContextSelectionState.CURRENT_RESET_MISSING,
+                ContextSelectionState.CURRENT_RESET_INVALID,
+            }
+            else 0
+        )
         return cls._unavailable(
             window_id,
             reason,
-            comparable_cycle_count=0,
+            comparable_cycle_count=count,
         )

@@ -174,8 +174,9 @@ class ContextRank:
 
     def describe(self) -> str:
         return (
-            f"{self.greater_count} historical values greater, "
-            f"{self.equal_count} equal, {self.lower_count} lower"
+            f"{self.greater_count} historical values greater than current, "
+            f"{self.equal_count} equal to current, "
+            f"{self.lower_count} lower than current"
         )
 
 
@@ -195,18 +196,87 @@ class ContextEmpiricalSummary:
     def __post_init__(self) -> None:
         if self.coverage is not ContextCoverage.from_cycle_count(self.cycle_count):
             raise ValueError("coverage must match cycle count")
-        if self.coverage is ContextCoverage.INSUFFICIENT and any(
-            value is not None
-            for value in (
-                self.rank,
-                self.observed_min,
-                self.observed_max,
-                self.median,
-                self.q25,
-                self.q75,
-            )
+        self._validate_statistic_values()
+        self._validate_rank_count()
+        self._validate_ordering()
+        self._validate_coverage_shape()
+
+    def _validate_statistic_values(self) -> None:
+        for value in self._statistics():
+            if value is not None and (
+                not value.is_finite() or not Decimal("0") <= value <= Decimal("1")
+            ):
+                raise ValueError("context summary statistics must be finite fractions")
+
+    def _validate_rank_count(self) -> None:
+        if self.rank is not None and self.rank.total_count != self.cycle_count:
+            raise ValueError("rank total must match independent cycle count")
+
+    def _validate_ordering(self) -> None:
+        if (
+            self.observed_min is not None
+            and self.observed_max is not None
+            and self.observed_min > self.observed_max
         ):
+            raise ValueError("observed context range must be ordered")
+        if (
+            self.observed_min is not None
+            and self.median is not None
+            and self.observed_max is not None
+            and not self.observed_min <= self.median <= self.observed_max
+        ):
+            raise ValueError("observed range and median must be ordered")
+        if (
+            self.q25 is not None
+            and self.median is not None
+            and self.q75 is not None
+            and not self.q25 <= self.median <= self.q75
+        ):
+            raise ValueError("established quartiles and median must be ordered")
+
+    def _validate_coverage_shape(self) -> None:
+        if self.coverage is ContextCoverage.INSUFFICIENT:
+            self._validate_insufficient_shape()
+        elif self.coverage is ContextCoverage.SPARSE:
+            self._validate_sparse_shape()
+        elif self.coverage is ContextCoverage.LIMITED:
+            self._validate_limited_shape()
+        else:
+            self._validate_established_shape()
+
+    def _validate_insufficient_shape(self) -> None:
+        if self.rank is not None or any(value is not None for value in self._statistics()):
             raise ValueError("insufficient coverage must suppress unsupported statistics")
+
+    def _validate_sparse_shape(self) -> None:
+        if self.observed_min is None or self.observed_max is None:
+            raise ValueError("sparse coverage requires observed min and max")
+        if any(value is not None for value in (self.median, self.q25, self.q75)):
+            raise ValueError("sparse coverage must suppress median and quartiles")
+
+    def _validate_limited_shape(self) -> None:
+        if any(
+            value is None
+            for value in (self.rank, self.observed_min, self.observed_max, self.median)
+        ):
+            raise ValueError("limited coverage requires rank, range and median")
+        if self.q25 is not None or self.q75 is not None:
+            raise ValueError("limited coverage must suppress quartiles")
+
+    def _validate_established_shape(self) -> None:
+        if any(value is None for value in (self.rank, self.median, self.q25, self.q75)):
+            raise ValueError("established coverage requires rank, median and quartiles")
+        if self.observed_min is not None or self.observed_max is not None:
+            raise ValueError("established coverage uses quartile band, not observed range")
+
+    def _statistics(self) -> tuple[Decimal | None, ...]:
+        return (
+            self.observed_min,
+            self.observed_max,
+            self.median,
+            self.q25,
+            self.q75,
+        )
 
 
 def contextual_tolerance(current: TimeToReset) -> timedelta:
@@ -233,58 +303,22 @@ def select_context_references(
     except ValueError:
         return ContextReferenceSelection(ContextSelectionState.CURRENT_RESET_INVALID)
 
-    current_cycle = CycleIdentity(current.window_id, current.resets_at)
     history = tuple(historical)
     if not history:
         return ContextReferenceSelection(ContextSelectionState.NO_HISTORICAL_OBSERVATIONS)
 
-    grouped: dict[CycleIdentity, list[ComparableCycleObservation]] = {}
-    identifiable_cycle_seen = False
-
-    for observation in history:
-        if observation.window_id != current.window_id:
-            continue
-        if observation.observed_at > current.observed_at:
-            continue
-        if observation.resets_at is None:
-            continue
-
-        try:
-            time_to_reset = TimeToReset.from_instants(
-                observed_at=observation.observed_at,
-                resets_at=observation.resets_at,
-            )
-        except ValueError:
-            continue
-
-        cycle = CycleIdentity(observation.window_id, observation.resets_at)
-        identifiable_cycle_seen = True
-        if cycle == current_cycle:
-            continue
-
-        grouped.setdefault(cycle, []).append(
-            ComparableCycleObservation(
-                cycle=cycle,
-                observed_at=observation.observed_at,
-                remaining=observation.remaining,
-                time_to_reset=time_to_reset,
-            )
-        )
-
+    current_cycle = CycleIdentity(current.window_id, current.resets_at)
+    grouped, identifiable_cycle_seen = _group_historical_cycles(
+        current=current,
+        current_cycle=current_cycle,
+        historical=history,
+    )
     if not identifiable_cycle_seen:
         return ContextReferenceSelection(ContextSelectionState.NO_IDENTIFIABLE_CYCLES)
     if not grouped:
         return ContextReferenceSelection(ContextSelectionState.NO_COMPARABLE_CYCLES)
 
-    tolerance = contextual_tolerance(current_time)
-    selected: list[ComparableCycleObservation] = []
-
-    for cycle in sorted(grouped, key=lambda identity: identity.resets_at):
-        nearest = _nearest_observation(grouped[cycle], current_time)
-        mismatch = abs(nearest.time_to_reset.duration - current_time.duration)
-        if mismatch <= tolerance:
-            selected.append(nearest)
-
+    selected = _select_comparable_cycles(grouped, current_time)
     if not selected:
         return ContextReferenceSelection(ContextSelectionState.NO_COMPARABLE_CYCLES)
 
@@ -293,9 +327,70 @@ def select_context_references(
         reference_set=ContextReferenceSet(
             current_cycle=current_cycle,
             current_time_to_reset=current_time,
-            observations=tuple(selected),
+            observations=selected,
         ),
     )
+
+
+def _group_historical_cycles(
+    *,
+    current: ContextObservation,
+    current_cycle: CycleIdentity,
+    historical: Iterable[ContextObservation],
+) -> tuple[dict[CycleIdentity, list[ComparableCycleObservation]], bool]:
+    grouped: dict[CycleIdentity, list[ComparableCycleObservation]] = {}
+    identifiable_cycle_seen = False
+
+    for observation in historical:
+        candidate = _comparable_candidate(current, observation)
+        if candidate is None:
+            continue
+        identifiable_cycle_seen = True
+        if candidate.cycle == current_cycle:
+            continue
+        grouped.setdefault(candidate.cycle, []).append(candidate)
+
+    return grouped, identifiable_cycle_seen
+
+
+def _comparable_candidate(
+    current: ContextObservation,
+    observation: ContextObservation,
+) -> ComparableCycleObservation | None:
+    if observation.window_id != current.window_id:
+        return None
+    if observation.observed_at > current.observed_at or observation.resets_at is None:
+        return None
+
+    try:
+        time_to_reset = TimeToReset.from_instants(
+            observed_at=observation.observed_at,
+            resets_at=observation.resets_at,
+        )
+    except ValueError:
+        return None
+
+    cycle = CycleIdentity(observation.window_id, observation.resets_at)
+    return ComparableCycleObservation(
+        cycle=cycle,
+        observed_at=observation.observed_at,
+        remaining=observation.remaining,
+        time_to_reset=time_to_reset,
+    )
+
+
+def _select_comparable_cycles(
+    grouped: dict[CycleIdentity, list[ComparableCycleObservation]],
+    current_time: TimeToReset,
+) -> tuple[ComparableCycleObservation, ...]:
+    tolerance = contextual_tolerance(current_time)
+    selected = []
+    for cycle in sorted(grouped, key=lambda identity: identity.resets_at):
+        nearest = _nearest_observation(grouped[cycle], current_time)
+        mismatch = abs(nearest.time_to_reset.duration - current_time.duration)
+        if mismatch <= tolerance:
+            selected.append(nearest)
+    return tuple(selected)
 
 
 def empirical_median(values: Sequence[Decimal]) -> Decimal:

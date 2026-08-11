@@ -12,8 +12,15 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from codexbar.application.redeem import RedeemProcessManager
+from codexbar.application.account_operations import AccountOperationClosedError
+from codexbar.application.redeem import (
+    RedeemBeginError,
+    RedeemProcessManager,
+    RedeemRecoveryError,
+    RedeemResult,
+)
 from codexbar.application.reset_events import RedeemAttemptId
+from codexbar.domain.errors import CodexBarError
 from codexbar.domain.models import UsageWindowId
 from codexbar.domain.reset import ResetCreditId
 from codexbar.ui.context_panel import HistoricalContextPanel
@@ -71,6 +78,11 @@ class BudgetPanel(QFrame):
         if state is None:
             self._body.setText("No budget state yet.")
             return
+        if state.usage.stale:
+            self._body.setText(
+                "Control / budget unavailable while current usage is stale."
+            )
+            return
 
         labels = {
             window.window_id: window.label
@@ -110,7 +122,7 @@ class RedeemPanel(QFrame):
         self,
         manager: RedeemProcessManager | None,
         *,
-        on_changed: Callable[[], None] | None = None,
+        on_changed: Callable[[RedeemResult], None] | None = None,
         parent: QWidget | None = None,
     ) -> None:
         super().__init__(parent)
@@ -219,24 +231,25 @@ class RedeemPanel(QFrame):
             return
         self._run(lambda: manager.retry(attempt_id))
 
-    def _run(self, action: Callable[[], object]) -> None:
+    def _run(self, action: Callable[[], RedeemResult]) -> None:
         self._active = True
         self._redeem.setEnabled(False)
         self._retry.setEnabled(False)
+        result: RedeemResult | None = None
         try:
             result = action()
-            attempt = getattr(result, "attempt", None)
-            status = getattr(attempt, "status", None)
-            self._status.setText(
-                f"Redeem result: "
-                f"{status.value if status is not None else 'completed'}"
-            )
-        except Exception as exc:
+            self._status.setText(f"Redeem result: {result.attempt.status.value}")
+        except (
+            AccountOperationClosedError,
+            CodexBarError,
+            RedeemBeginError,
+            RedeemRecoveryError,
+        ) as exc:
             self._status.setText(f"Redeem failed: {exc}")
         finally:
             self._active = False
-            if self._on_changed is not None:
-                self._on_changed()
+        if result is not None and self._on_changed is not None:
+            self._on_changed(result)
 
 
 class CurrentAccountPanel(RichUsagePanel):
@@ -247,16 +260,13 @@ class CurrentAccountPanel(RichUsagePanel):
         *,
         context_presenter: ContextPresenter | None = None,
         on_history: Callable[[UsageWindowId], None] | None = None,
-        on_redeem_changed: Callable[[], None] | None = None,
+        on_redeem_changed: Callable[[RedeemResult], None] | None = None,
     ) -> None:
         super().__init__(on_history=on_history)
         self._presenter = presenter
-        selected_context_presenter = context_presenter or getattr(
-            presenter, "context_presenter", None
-        )
         self.context_panel = (
-            HistoricalContextPanel(selected_context_presenter, self)
-            if selected_context_presenter is not None
+            HistoricalContextPanel(context_presenter, self)
+            if context_presenter is not None
             else None
         )
         self.reset_panel = ResetCreditsPanel(self)

@@ -70,6 +70,7 @@ def test_task_615_617_characterization_preserves_schema_v1(tmp_path: Path) -> No
     assert report.history_30d_query.repeats == 2
     assert report.window_180d_query.repeats == 2
     assert report.context_candidate_query.repeats == 2
+    assert report.production_context_summary.repeats == 2
     assert "Retain schema v1" in report.index_decision
 
 

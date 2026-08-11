@@ -219,6 +219,61 @@ def _payload_from_data(
     raise ValueError(f"unsupported reset event type: {event_type}")
 
 
+def _index_columns(
+    connection: sqlite3.Connection,
+    index_name: str,
+) -> tuple[str, ...]:
+    return tuple(
+        row[2]
+        for row in connection.execute(f"PRAGMA index_info({index_name})")
+    )
+
+
+def _primary_key_columns(
+    connection: sqlite3.Connection,
+    table: str,
+) -> tuple[str, ...]:
+    rows = connection.execute(f"PRAGMA table_info({table})").fetchall()
+    keyed = sorted((row[5], row[1]) for row in rows if row[5])
+    return tuple(name for _position, name in keyed)
+
+
+def _has_unique_index(
+    connection: sqlite3.Connection,
+    table: str,
+    columns: tuple[str, ...],
+) -> bool:
+    for row in connection.execute(f"PRAGMA index_list({table})"):
+        if bool(row[2]) and _index_columns(connection, row[1]) == columns:
+            return True
+    return False
+
+
+def _validate_operational_contract(connection: sqlite3.Connection) -> None:
+    if _primary_key_columns(connection, "reset_events") != ("sequence",):
+        raise ResetLedgerSchemaError(
+            "reset ledger sequence primary key is invalid"
+        )
+    if not _has_unique_index(
+        connection,
+        "reset_events",
+        ("event_id",),
+    ):
+        raise ResetLedgerSchemaError(
+            "reset ledger event-id uniqueness constraint is missing"
+        )
+    if _index_columns(
+        connection,
+        "idx_reset_events_occurred_at",
+    ) != (
+        "occurred_at_utc",
+        "sequence",
+    ):
+        raise ResetLedgerSchemaError(
+            "reset ledger occurred-at index is missing or incompatible"
+        )
+
+
 class SqliteResetEventRepository(ResetEventRepository):
     def __init__(self, path: Path) -> None:
         self._path = path
@@ -263,6 +318,8 @@ class SqliteResetEventRepository(ResetEventRepository):
                         raise ResetLedgerSchemaError(
                             f"reset ledger table {table!r} does not match schema v1"
                         )
+
+                _validate_operational_contract(connection)
         except ResetLedgerSchemaError:
             raise
         except sqlite3.DatabaseError as exc:

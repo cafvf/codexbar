@@ -133,6 +133,8 @@ def _reason_text(reason: HistoricalContextReason | None) -> str:
     return {
         HistoricalContextReason.CURRENT_WINDOW_MISSING:
             "Current window is unavailable.",
+        HistoricalContextReason.CURRENT_NOT_CURRENT:
+            "Current usage is stale; historical comparison is withheld.",
         HistoricalContextReason.CURRENT_RESET_MISSING:
             "Current reset timestamp is unavailable; historical comparison is not inferred.",
         HistoricalContextReason.CURRENT_RESET_INVALID:
@@ -164,7 +166,4 @@ def _coverage_text(coverage: ContextCoverage) -> str:
 def _rank_text(rank: ContextRank | None) -> str | None:
     if rank is None:
         return None
-    return (
-        f"Historical comparison: {rank.greater_count} greater, "
-        f"{rank.equal_count} equal, {rank.lower_count} lower."
-    )
+    return f"Historical comparison: {rank.describe()}."

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
 
 from codexbar.application.account import AccountRateLimitsReader, ResetCreditConsumer
@@ -10,12 +11,21 @@ from codexbar.application.account_operations import (
 from codexbar.application.account_presentation import LatestAccountObservationReader
 from codexbar.application.account_runtime import CapturingAccountRateLimitsReader
 from codexbar.application.analytics import HistoricalAnalysisService
-from codexbar.application.context import HistoricalContextService
-from codexbar.application.current_account import CurrentAccountController
+from codexbar.application.context import (
+    FailedContextHistoryRepository,
+    HistoricalContextService,
+)
+from codexbar.application.history import HistoryError
 from codexbar.application.history_runtime import HistoryService
 from codexbar.application.ports import NotificationPort, UsageProvider
 from codexbar.application.redeem import RedeemProcessManager
+from codexbar.application.reset_ledger import (
+    ResetEventRepository,
+    ResetLedgerError,
+    ResetLedgerReadError,
+)
 from codexbar.application.reset_ledger_service import ResetLedgerService
+from codexbar.application.reset_projection import ResetLedgerProjection
 from codexbar.application.settings import GetSettings, SettingsRepository
 from codexbar.application.usage_adapter import AccountUsageProvider
 from codexbar.infrastructure.account_reader import CodexAccountRateLimitsReader
@@ -41,6 +51,19 @@ from codexbar.ui.current_account_viewmodel import CurrentAccountPresenter
 from codexbar.ui.history_controller import HistoryController
 
 
+@dataclass(frozen=True, slots=True)
+class HistoryRuntime:
+    service: HistoryService | None
+    controller: HistoryController
+    context_service: HistoricalContextService
+
+
+@dataclass(frozen=True, slots=True)
+class ResetRuntime:
+    repository: ResetEventRepository | None
+    service: ResetLedgerService | None
+
+
 @dataclass(slots=True)
 class GuiRuntime:
     provider: UsageProvider
@@ -49,16 +72,14 @@ class GuiRuntime:
     history_controller: HistoryController
     context_service: HistoricalContextService
     context_presenter: ContextPresenter
-    account_controller: CurrentAccountController | None = None
-    operation_coordinator: AccountOperationCoordinator | None = None
+    operation_coordinator: AccountOperationCoordinator
+    presenter: CurrentAccountPresenter
     reset_ledger_service: ResetLedgerService | None = None
-    presenter: CurrentAccountPresenter | None = None
     redeem_manager: RedeemProcessManager | None = None
 
     def close(self) -> None:
         self.history_controller.close()
-        if self.operation_coordinator is not None:
-            self.operation_coordinator.close()
+        self.operation_coordinator.close()
 
 
 def build_usage_provider(*, mock: bool = False) -> UsageProvider:
@@ -67,66 +88,110 @@ def build_usage_provider(*, mock: bool = False) -> UsageProvider:
     return AccountUsageProvider(CodexAccountRateLimitsReader())
 
 
+def _build_history_runtime(*, mock: bool) -> HistoryRuntime:
+    path = history_database_path()
+    try:
+        repository = SqliteHistoryRepository(path)
+    except HistoryError as exc:
+        service = None
+        context_service = HistoricalContextService(
+            MockContextHistoryRepository()
+            if mock
+            else FailedContextHistoryRepository(exc)
+        )
+    else:
+        service = HistoryService(repository)
+        context_service = HistoricalContextService(
+            MockContextHistoryRepository()
+            if mock
+            else SqliteContextHistoryRepository(repository)
+        )
+
+    controller = HistoryController(
+        HistoricalAnalysisService(open_history_analytics_repository(path))
+    )
+    return HistoryRuntime(
+        service=service,
+        controller=controller,
+        context_service=context_service,
+    )
+
+
+def _build_reset_runtime() -> ResetRuntime:
+    path = reset_ledger_database_path()
+    try:
+        repository = SqliteResetEventRepository(path)
+    except ResetLedgerError:
+        return ResetRuntime(repository=None, service=None)
+    return ResetRuntime(
+        repository=repository,
+        service=ResetLedgerService(repository),
+    )
+
+
+def _unavailable_reset_projection() -> ResetLedgerProjection:
+    raise ResetLedgerReadError("reset ledger is unavailable")
+
+
+def _projection_provider(
+    service: ResetLedgerService | None,
+) -> Callable[[], ResetLedgerProjection]:
+    return service.projection if service is not None else _unavailable_reset_projection
+
+
+def _account_adapters(
+    *,
+    mock: bool,
+) -> tuple[AccountRateLimitsReader, ResetCreditConsumer]:
+    if mock:
+        return MockAccountRateLimitsReader(), MockResetCreditConsumer()
+    return CodexAccountRateLimitsReader(), CodexResetCreditConsumer()
+
+
 def build_gui_runtime(*, mock: bool = False) -> GuiRuntime:
-    history_path = history_database_path()
-    history_repository = SqliteHistoryRepository(history_path)
-    history_service = HistoryService(history_repository)
-    history_controller = HistoryController(
-        HistoricalAnalysisService(open_history_analytics_repository(history_path))
-    )
-    context_repository = (
-        MockContextHistoryRepository()
-        if mock
-        else SqliteContextHistoryRepository(history_repository)
-    )
-    context_service = HistoricalContextService(context_repository)
+    history = _build_history_runtime(mock=mock)
+    reset = _build_reset_runtime()
     settings_repository = JsonSettingsRepository()
     settings = GetSettings(settings_repository).execute().settings
     notifier = NotifySendNotificationAdapter()
-
-    reset_repository = SqliteResetEventRepository(reset_ledger_database_path())
-    reset_ledger_service = ResetLedgerService(reset_repository)
     coordinator = AccountOperationCoordinator()
+    reader, consumer = _account_adapters(mock=mock)
 
-    if mock:
-        reader: AccountRateLimitsReader = MockAccountRateLimitsReader()
-        consumer: ResetCreditConsumer = MockResetCreditConsumer()
-    else:
-        reader = CodexAccountRateLimitsReader()
-        consumer = CodexResetCreditConsumer()
-
-    reader = CapturingAccountRateLimitsReader(
+    capturing_reader = CapturingAccountRateLimitsReader(
         reader,
-        history_service,
-        reset_ledger_service,
+        history.service,
+        reset.service,
     )
-    latest_reader = LatestAccountObservationReader(reader)
+    latest_reader = LatestAccountObservationReader(capturing_reader)
     coordinated_reader = CoordinatedAccountRateLimitsReader(latest_reader, coordinator)
-    redeem_manager = RedeemProcessManager(
-        reset_repository,
-        consumer,
-        latest_reader,
-        coordinator,
+
+    redeem_manager = (
+        RedeemProcessManager(
+            reset.repository,
+            consumer,
+            latest_reader,
+            coordinator,
+        )
+        if reset.repository is not None
+        else None
     )
     presenter = CurrentAccountPresenter(
         latest_reader,
         settings,
-        reset_ledger_service.projection,
+        _projection_provider(reset.service),
         redeem_manager=redeem_manager,
     )
-    context_presenter = ContextPresenter(latest_reader, context_service)
-    presenter.context_presenter = context_presenter
+    context_presenter = ContextPresenter(latest_reader, history.context_service)
 
     return GuiRuntime(
         provider=AccountUsageProvider(coordinated_reader),
         settings_repository=settings_repository,
         notifier=notifier,
-        history_controller=history_controller,
-        context_service=context_service,
+        history_controller=history.controller,
+        context_service=history.context_service,
         context_presenter=context_presenter,
-        account_controller=CurrentAccountController(coordinated_reader),
         operation_coordinator=coordinator,
-        reset_ledger_service=reset_ledger_service,
+        reset_ledger_service=reset.service,
         presenter=presenter,
         redeem_manager=redeem_manager,
     )

@@ -112,7 +112,10 @@ def test_tv_1606_rank_ties_are_explicit_and_human_readable() -> None:
     assert rank == ContextRank(greater_count=1, equal_count=2, lower_count=1)
     assert rank.total_count == 4
     assert rank.has_ties
-    assert rank.describe() == "1 historical values greater, 2 equal, 1 lower"
+    assert rank.describe() == (
+        "1 historical values greater than current, 2 equal to current, "
+        "1 lower than current"
+    )
 
 
 def test_tv_1607_established_quantiles_use_frozen_decimal_convention() -> None:
@@ -212,4 +215,16 @@ def test_task_639_summary_rejects_inconsistent_insufficient_payload() -> None:
             coverage=ContextCoverage.INSUFFICIENT,
             cycle_count=2,
             median=Decimal("0.30"),
+        )
+
+
+def test_context_summary_rejects_median_outside_observed_range() -> None:
+    with pytest.raises(ValueError, match="range and median"):
+        ContextEmpiricalSummary(
+            coverage=ContextCoverage.LIMITED,
+            cycle_count=5,
+            rank=ContextRank(greater_count=2, equal_count=1, lower_count=2),
+            observed_min=Decimal("0.20"),
+            observed_max=Decimal("0.60"),
+            median=Decimal("0.70"),
         )

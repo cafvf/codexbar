@@ -6,3 +6,5 @@ __pycache__/
 dist/
 build/
 *.egg-info/
+
+docs/validation/*.local.md

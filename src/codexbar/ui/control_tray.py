@@ -4,6 +4,7 @@ import sys
 
 from PySide6.QtWidgets import QApplication
 
+from codexbar.application.instance_ownership import InstanceOwnerBinding
 from codexbar.application.ports import NotificationPort, UsageProvider
 from codexbar.application.redeem import RedeemProcessManager, RedeemResult
 from codexbar.application.settings import SettingsRepository
@@ -85,6 +86,7 @@ def run_tray(
     presenter: CurrentAccountPresenter,
     redeem_manager: RedeemProcessManager | None,
     context_presenter: ContextPresenter | None = None,
+    instance_owner: InstanceOwnerBinding | None = None,
 ) -> int:
     instance = QApplication.instance()
     app = instance if isinstance(instance, QApplication) else QApplication(sys.argv)
@@ -100,5 +102,7 @@ def run_tray(
         redeem_manager,
         context_presenter,
     )
+    if instance_owner is not None:
+        instance_owner.bind_show_details(shell.show_panel)
     shell.start()
     return app.exec()

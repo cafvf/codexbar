@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 
+from codexbar.application.instance_ownership import InstanceOwnerBinding, InstanceResolution
 from codexbar.application.ports import NotificationPort, UsageProvider
 from codexbar.application.redeem import RedeemProcessManager
 from codexbar.application.settings import GetSettings, SettingsRepository
@@ -35,6 +36,7 @@ ControlQtTrayRunner = Callable[
         CurrentAccountPresenter,
         RedeemProcessManager | None,
         ContextPresenter | None,
+        InstanceOwnerBinding | None,
     ],
     int,
 ]
@@ -67,6 +69,15 @@ def _load_control_qt_tray() -> ControlQtTrayRunner:
     return run_tray
 
 
+def resolve_gui_instance() -> InstanceResolution:
+    try:
+        from codexbar.ui.instance_ownership import resolve_gui_instance as resolve
+    except ModuleNotFoundError as exc:
+        _normalize_qt_import_error(exc)
+        raise
+    return resolve()
+
+
 def _normalize_qt_import_error(exc: ModuleNotFoundError) -> None:
     if exc.name and exc.name.startswith("PySide6"):
         raise GuiDependencyError(
@@ -84,6 +95,7 @@ def run_tray(
     presenter: CurrentAccountPresenter | None = None,
     redeem_manager: RedeemProcessManager | None = None,
     context_presenter: ContextPresenter | None = None,
+    instance_owner: InstanceOwnerBinding | None = None,
 ) -> int:
     settings = GetSettings(repository).execute().settings
 
@@ -97,7 +109,11 @@ def run_tray(
             presenter,
             redeem_manager,
             context_presenter,
+            instance_owner,
         )
+
+    if instance_owner is not None:
+        raise RuntimeError("instance ownership requires the composed v1.6+ control tray")
 
     if history_controller is not None:
         return _load_historical_qt_tray()(

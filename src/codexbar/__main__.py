@@ -305,21 +305,30 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.gui:
         try:
-            from codexbar.ui.launcher import run_tray
+            from codexbar.ui.launcher import resolve_gui_instance, run_tray
 
-            runtime = build_gui_runtime(mock=args.mock)
+            ownership = resolve_gui_instance()
+            if not ownership.is_owner:
+                return 0
+            owner = ownership.owner
+            assert owner is not None
             try:
-                return run_tray(
-                    runtime.provider,
-                    repository=runtime.settings_repository,
-                    notifier=runtime.notifier,
-                    history_controller=runtime.history_controller,
-                    presenter=runtime.presenter,
-                    redeem_manager=runtime.redeem_manager,
-                    context_presenter=runtime.context_presenter,
-                )
+                runtime = build_gui_runtime(mock=args.mock)
+                try:
+                    return run_tray(
+                        runtime.provider,
+                        repository=runtime.settings_repository,
+                        notifier=runtime.notifier,
+                        history_controller=runtime.history_controller,
+                        presenter=runtime.presenter,
+                        redeem_manager=runtime.redeem_manager,
+                        context_presenter=runtime.context_presenter,
+                        instance_owner=owner,
+                    )
+                finally:
+                    runtime.close()
             finally:
-                runtime.close()
+                owner.close()
         except CodexBarError as exc:
             print(f"CodexBar: {exc}", file=sys.stderr)
             return 2

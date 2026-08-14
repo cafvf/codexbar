@@ -1,8 +1,8 @@
 # CodexBar Product Roadmap
 
 Status: active planning roadmap
-Current release: v1.6.0 — Context
-Last reviewed: 2026-08-10
+Current release: v1.7.0 — Diagnose
+Last reviewed: 2026-08-14
 
 ## Product progression
 
@@ -15,9 +15,9 @@ Last reviewed: 2026-08-10
 | v1.4 | Understand | What does retained history show descriptively? | Released |
 | v1.5 | Control | What deterministic reserve/reset actions are available? | Released |
 | v1.6 | Context | How does Current compare with independent prior cycles? | Released |
-| v1.7 | Diagnose | Is CodexBar healthy, coherent, responsive, and explainable? | Planning |
-| v1.8 | Explore | Why did Context choose this evidence and how do cycles compare? | Proposed |
-| v1.9 | Plan | How does Current compare with explicit user-defined checkpoints? | Proposed |
+| v1.7 | Diagnose | Is CodexBar healthy, coherent, responsive, and explainable? | Released |
+| v1.8 | Plan | How does Current compare with explicit user-defined checkpoints and reserves? | Proposed |
+| v1.9 | Explore | Why did Context choose this evidence and how do cycles compare? | Proposed |
 | v2.0 | Activity | How does observed Codex activity organize into sessions/work patterns? | Research horizon |
 
 ## Roadmap principles
@@ -39,6 +39,8 @@ Last reviewed: 2026-08-10
 10. Physical Linux desktop validation remains necessary for native integration.
 
 ## v1.7 — Diagnose
+
+Status: released as `v1.7.0` on 2026-08-14.
 
 Primary intent:
 
@@ -63,7 +65,71 @@ Primary outcomes:
 
 See `docs/specs/v1.7/PLANNING.md`.
 
-## v1.8 — Explore
+## v1.8 — Plan
+
+Primary intent:
+
+> Let the user define explicit factual operating targets for each dynamic usage
+> window and compare Current against those targets without forecasting.
+
+Product question:
+
+> How does Current compare with the plan I explicitly configured for this window?
+
+Proposed product direction:
+
+- user-defined plan policies by `UsageWindowId`;
+- explicit checkpoint floors expressed in time-to-reset coordinates;
+- deterministic plan status relative to each applicable checkpoint;
+- richer reserve policies without changing Current authority;
+- configurable factual notification rules derived from Current + explicit policy;
+- clear distinction between reserve, checkpoint and notification semantics;
+- optional runtime integration of reset-credit expiry/count-change facts only when
+  supported capability evidence is available.
+
+Conceptual policy model:
+
+- `reserve_floor`: how much capacity the user intends to preserve;
+- `checkpoints[]`: minimum remaining fraction at explicit time-to-reset positions;
+- `notification_rules[]`: factual conditions under which the user wants an alert.
+
+Architectural boundaries:
+
+- Current remains the only authority for current usage state;
+- Settings/Plan Policy define user intent;
+- History and Historical Context MUST NOT influence deterministic plan evaluation;
+- plan status MUST NOT estimate future consumption or probability of exhaustion;
+- plan status MUST NOT trigger automatic reset-credit redemption;
+- reset-credit notifications remain evidence-gated and factual.
+
+Example framing:
+
+- `Current remaining: 63%`;
+- `Plan floor at this checkpoint: 55%`;
+- `Margin: +8 percentage points`;
+- `Status: On plan`.
+
+This is a deterministic comparison between an observed fact and an explicit user
+policy. It is not a consumption forecast.
+
+Dependency note:
+
+v1.8 Plan depends primarily on capabilities already stabilized through v1.7:
+dynamic `UsageWindowId`, Current authority, Settings, Control/Budget, alerts,
+reset-credit capability representation, asynchronous runtime foundations,
+diagnostics and hosted release gates. It does not require the richer Historical
+Context exploration proposed for v1.9.
+
+## v1.9 — Explore
+
+Primary intent:
+
+> Make retained historical evidence inspectable enough that the user can understand
+> why Historical Context selected specific cycles and how those cycles compare.
+
+Product question:
+
+> Why did Context choose this evidence and how do the comparable cycles differ?
 
 Proposed product direction:
 
@@ -75,21 +141,52 @@ Proposed product direction:
 - CSV/JSON export for History and reset ledger;
 - support bundle with sanitized diagnostics.
 
-v1.8 should remain descriptive. It must not turn empirical bands into confidence or
-prediction intervals.
+Architectural boundaries:
 
-## v1.9 — Plan
+- Explore remains descriptive;
+- empirical bands remain empirical and MUST NOT be presented as confidence or
+  prediction intervals;
+- Cycle Explorer MUST NOT become a forecasting surface;
+- History remains observational evidence and does not become Current authority;
+- Control, Budget, Plan and alerts remain independent of Historical Context;
+- exports and support bundles must preserve secret minimization and data-lineage
+  rules established in v1.7.
 
-Proposed product direction:
+Dependency note:
 
-- user-defined time/checkpoint floors by UsageWindowId;
-- deterministic plan status relative to those checkpoints;
-- richer reserve policies;
-- configurable factual notification rules;
-- formal runtime integration of reset-credit expiry/count-change facts if capability
-  evidence supports it.
+v1.9 Explore builds on v1.6 Historical Context and the v1.7 Context runtime,
+diagnostics and lineage foundations. It may consume Plan-related UI conventions
+introduced in v1.8, but its domain semantics do not depend on Plan.
 
-The intended framing is “plan versus current fact,” not predicted consumption.
+## Sequencing decision: Plan before Explore
+
+The roadmap originally listed Explore as v1.8 and Plan as v1.9.
+
+After v1.7 runtime/diagnostic closure, the dependency graph was reviewed and the
+order was intentionally inverted:
+
+- v1.8 is now **Plan**;
+- v1.9 is now **Explore**.
+
+Rationale:
+
+1. Plan depends mostly on capabilities already mature in v1.7: Current, dynamic
+   window identity, Settings, Control/Budget, alerts, reset-credit capabilities,
+   diagnostics and asynchronous runtime foundations.
+2. Plan does not require explainable cycle selection, Cycle Explorer or expanded
+   History views.
+3. Explore benefits from additional retained real History and can follow without
+   losing semantic integrity.
+4. Version numbers remain monotonic; the project will not release v1.9 before
+   v1.8 and later “return” to an older version number.
+
+The two releases remain architecturally adjacent rather than strictly chained:
+
+`v1.7 Diagnose -> v1.8 Plan`
+and
+`v1.7 Diagnose -> v1.9 Explore`.
+
+No dependency is introduced from Historical Context into Plan authority.
 
 ## v2.0 — Activity research horizon
 

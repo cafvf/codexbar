@@ -75,3 +75,10 @@ The detailed settings traceability matrix is maintained in
 | REQ-SETTINGS-001 | AC-SETTINGS-020..024 | `ui/settings.py`, Qt tray, Ayatana Settings intent | GUI tests + Ubuntu/GNOME/Wayland validation | validated |
 
 ADR-005 records the schema-v1 persistence compatibility boundary. The v1.1 release scope is closed.
+
+## v1.7 — Diagnose
+
+The v1.7 release-level matrix is maintained in `docs/TRACEABILITY-v1.7.md`.
+It covers diagnostics, health, single-instance ownership, async Context/redeem,
+account lineage, source compatibility, Budget clarification, native hardening,
+version/CI, performance and evidence-gated maintenance.

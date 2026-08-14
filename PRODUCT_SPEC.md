@@ -1,9 +1,9 @@
 # CodexBar Product Specification
 
-Status: v1.6.0 release candidate
-Current validated baseline: 1.5.0
-Release candidate: 1.6.0
-Theme: Context
+Status: v1.7.0 release candidate
+Current validated baseline: 1.6.0
+Release candidate: 1.7.0
+Theme: Diagnose
 
 ## Purpose
 
@@ -73,6 +73,22 @@ Read-only descriptive analytics, History UI, richer CURRENT details and stabiliz
 11. Schema v1 and current indexes are retained after 180-day performance characterization.
 12. Real-account validation is read-only; missing runtime capability may be recorded as an explicit release SKIP.
 
+### v1.7 — Diagnose
+1. Doctor text, JSON diagnostics and System Health share one typed diagnostic model.
+2. Doctor/System Health remain read-only and minimize secret/account-identifying output.
+3. Runtime diagnostic metrics are local, in-memory, bounded and use monotonic duration measurement.
+4. One normal GUI process owns polling, notifications, desktop indicator and redeem interaction per user/session.
+5. A second GUI launch requests `SHOW_DETAILS` from the existing owner and exits.
+6. Historical Context uses Current/History revisions, a lean schema-v1 candidate projection and revision-aware caching without changing v1.6 semantics.
+7. Context repository/summary computation and external redeem/refetch work execute outside the Qt interaction thread.
+8. Stale async Context results and obsolete/closed redeem completions cannot overwrite newer state or resurrect closed UI.
+9. System Health is a separate auto-updating read-only window; Open Details owns authoritative manual Refresh.
+10. Account lineage is explicit: v1.7 local History assumes one ChatGPT account and is not durably namespaced by a supported stable account identifier.
+11. Budget without a configured reserve reports headroom as not applicable.
+12. The native Ayatana helper remains supported with bounded stderr diagnostics, dynamic label guidance and Qt fallback.
+13. `pyproject.toml` is the single release-version authority and hosted CI covers Python 3.12, 3.13 and 3.14.
+14. Evidence-gated app-server, prune, WAL and Ayatana changes were evaluated and intentionally retained without speculative migration.
+
 ## Non-functional invariants
 
 - domain/application behavior remains headless and deterministic except explicit composition boundaries;
@@ -86,7 +102,7 @@ Read-only descriptive analytics, History UI, richer CURRENT details and stabiliz
 - native system-Python helper remains isolated and Qt fallback remains part of the product contract;
 - persistence-format evolution requires an explicit compatibility decision.
 
-## Explicitly deferred beyond v1.5
+## Explicitly deferred beyond v1.7
 
 - forecasting or time-to-exhaustion;
 - authoritative token-consumption estimation;

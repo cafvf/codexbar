@@ -103,12 +103,14 @@ class SystemHealthDialog(QDialog):
         layout.addWidget(scroll)
 
         controls = QHBoxLayout()
+        auto_refresh = QLabel(
+            "Updates automatically while this window is open.",
+            self,
+        )
+        controls.addWidget(auto_refresh)
         controls.addStretch(1)
-        refresh = QPushButton("Refresh", self)
         close = QPushButton("Close", self)
-        refresh.clicked.connect(self.panel.refresh)
         close.clicked.connect(self.close)
-        controls.addWidget(refresh)
         controls.addWidget(close)
         layout.addLayout(controls)
 

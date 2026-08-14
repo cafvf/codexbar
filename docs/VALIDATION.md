@@ -259,3 +259,15 @@ Disposition: **REQ-SETTINGS-001 validated and closed.**
 
 Before creating the v1.1.0 tag, rerun the final release gates from `docs/GIT_WORKFLOW.md`. The final gate run
 belongs to release hygiene; it does not reopen the already completed requirement unless it finds a regression.
+
+## v1.7 — Diagnose release disposition
+
+The v1.7 target validation record is maintained in `docs/VALIDATION-v1.7.0.md`.
+
+Phase H local/physical evidence is green: Doctor read-only validation, real
+History/Context/System Health state, performance characterization, single-instance
+IPC and the Ubuntu/GNOME/Wayland physical cycle passed. One System Health
+refresh-semantics defect was corrected and physically retested.
+
+Final release status remains conditional on the post-bump version-mode/global gate
+and hosted Python 3.12/3.13/3.14 release-prep CI.

@@ -1,5 +1,42 @@
 # Changelog
 
+## 1.7.0 — 2026-08-14
+
+Release candidate **Diagnose**.
+
+### Added
+- unified typed runtime diagnostics shared by Doctor, JSON diagnostics and System Health;
+- `codexbar doctor` and `codexbar doctor --json` with read-only/secret-minimized diagnostics schema v1;
+- bounded in-memory runtime metrics with monotonic timing and sample-count-aware p50/p95;
+- one-owner GUI runtime with second-launch `SHOW_DETAILS` IPC;
+- revision-aware Historical Context caching, lean schema-v1 candidate reads and stale-result rejection;
+- asynchronous Context and reset-credit redeem orchestration outside the Qt interaction thread;
+- separate human-readable System Health window with optional technical details;
+- explicit account-lineage status for the single-account local-History assumption;
+- hosted Python 3.12/3.13/3.14 CI and isolated uv-tool version validation.
+
+### Changed
+- Historical Context belongs to Usage History rather than Open Details;
+- no-policy Budget headroom is `Not applicable` instead of an implied numeric zero;
+- System Health auto-updates as a read-only observer; authoritative manual Refresh remains an Open Details action;
+- runtime package version derives from package metadata, with `pyproject.toml` as the single release authority;
+- native-helper stderr handling and label width guidance are hardened without replacing the validated Ayatana/Qt architecture.
+
+### Evidence-gated decisions
+- retain one-shot Codex app-server lifecycle;
+- retain current History prune cadence;
+- retain current SQLite journal behavior rather than enabling WAL;
+- retain Ayatana helper plus Qt fallback;
+- do not add a canberra hard dependency;
+- do not add a property-based testing dependency for v1.7.
+
+### Validation
+- H1 local gate: 718 tests passed; Ruff, strict mypy, compileall and `git diff --check` passed;
+- Doctor read-only proof: settings, History and reset-ledger hashes unchanged before/after;
+- Context cache-hit p95 0.0047 ms, Qt-sync p95 0.0408 ms, cold p95 17.383 ms;
+- second-instance `SHOW_DETAILS` IPC p95 7.853 ms;
+- target physical validation passed after the System Health refresh-semantics correction was retested.
+
 ## 1.6.0 — 2026-08-10
 
 Release candidate **Context**.

@@ -2,7 +2,7 @@
 
 CodexBar is a Linux tray application for monitoring Codex usage, retaining bounded observational history, and exposing explicit reset-credit control when the local Codex app-server provides that capability.
 
-Current release: **1.6.0 — Context**.
+Current release: **1.7.0 — Diagnose**.
 
 ## What CodexBar does
 
@@ -132,7 +132,7 @@ The reset recommendation is deterministic and based on current factual state plu
 
 ### Historical context
 
-Open Details also exposes **Historical context** for a current usage window when
+Usage History also exposes **Historical context** for a current usage window when
 authoritative reset metadata and comparable retained cycles are available.
 
 Context compares the current remaining fraction with at most one real retained
@@ -142,6 +142,21 @@ number of independent comparable cycles.
 
 Context is descriptive only. It does not forecast exhaustion, estimate probability
 of future usage, influence alerts, alter Control/Budget policy, or trigger redeem.
+
+### System Health
+
+**System Health** is a separate read-only window for runtime diagnostics. It
+updates automatically while open and summarizes Current, History, Historical
+Context, account-history scope, desktop backend state and bounded runtime timing
+metrics.
+
+Technical details are hidden by default. System Health does not initiate an
+authoritative usage read or mutate History, settings, the reset ledger or reset
+credits. Use **Refresh** in Open Details when you want CodexBar to request new
+authoritative usage data.
+
+`codexbar doctor` exposes the same diagnostic model in text form, while
+`codexbar doctor --json` provides machine-readable diagnostics schema version 1.
 
 ### History
 
@@ -220,19 +235,19 @@ uv run python -m compileall -q src scripts
 git diff --check
 ```
 
-v1.5 target validation:
+v1.7 read-only target validation:
 
 ```bash
-uv run python scripts/validate_v1_5.py
+uv run python scripts/validate_v17_phase_h.py
 ```
 
-Optional read-only validation against the authenticated real account:
+Machine-readable Doctor:
 
 ```bash
-uv run python scripts/validate_v1_5.py --real-read
+uv run python -m codexbar doctor --json
 ```
 
-Real redeem validation is intentionally not automated because it spends a real reset credit.
+Real redeem validation is intentionally capability-gated because it may spend a real reset credit.
 
 ## Persistence
 
@@ -247,6 +262,11 @@ No persistence store is allowed to fabricate or replace current authoritative ac
 ## Release documentation
 
 Release-specific documents:
+
+- `docs/specs/v1.7/` — frozen v1.7 Diagnose requirements, tasks and architecture;
+- `docs/TRACEABILITY-v1.7.md` — v1.7 release traceability;
+- `docs/VALIDATION-v1.7.0.md` — v1.7 target/release evidence;
+- `docs/RELEASE-CHECKLIST-v1.7.0.md` — v1.7 release/tag checklist;
 
 - `PRODUCT_SPEC.md` — product model and release evolution;
 - `CHANGELOG.md` — release history;
@@ -263,3 +283,5 @@ CodexBar does not manage Codex credentials.
 Raw credentials and raw provider payloads do not cross into History, notifications, the reset event ledger, or native-helper boundaries.
 
 History and the reset event ledger are evidence stores. Neither is a fallback source for current account state.
+
+History and Historical Context currently assume one local ChatGPT account at a time. After intentionally switching accounts, clear local History before relying on cross-cycle Context. CodexBar does not decode private auth/JWT material to manufacture an account identifier.

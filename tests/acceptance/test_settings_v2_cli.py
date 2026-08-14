@@ -37,6 +37,7 @@ def test_settings_show_reports_schema_and_reserves_deterministically(
 
 def test_settings_reset_still_removes_schema_2_file(monkeypatch, tmp_path) -> None:
     monkeypatch.setenv("HOME", str(tmp_path))
+    monkeypatch.delenv("XDG_CONFIG_HOME", raising=False)
     path = tmp_path / ".config/codexbar/settings.json"
     path.parent.mkdir(parents=True)
     path.write_text("{}")

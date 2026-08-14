@@ -41,6 +41,11 @@ jobs:
       - name: Install Python
         run: uv python install "${UV_PYTHON}"
 
+      - name: Install headless Qt runtime libraries
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes --no-install-recommends libegl1
+
       - name: Sync project
         run: uv sync --locked --python "${UV_PYTHON}" --extra dev --extra gui
 

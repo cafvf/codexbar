@@ -216,6 +216,7 @@ class HistoryDialog(QDialog):
             self._summary_values[key] = value
         layout.addWidget(self.summary_widget)
 
+
         self.chart = HistoryChart(self)
         layout.addWidget(self.chart)
 

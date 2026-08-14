@@ -4,14 +4,17 @@ import json
 import os
 import select
 import subprocess
+from collections import deque
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from typing import Final, Protocol, runtime_checkable
+from threading import RLock, Thread
+from typing import Final, Protocol, TextIO, runtime_checkable
 
-NATIVE_LABEL_GUIDE: Final = "5h: 100% · W: 100% · stale"
 SYSTEM_PYTHON: Final = "/usr/bin/python3"
+NATIVE_STDERR_MAX_LINES: Final = 64
+NATIVE_STDERR_MAX_CHARS_PER_LINE: Final = 2048
 
 
 _UNSAFE_NATIVE_ENV_KEYS: Final = (
@@ -27,7 +30,6 @@ _UNSAFE_NATIVE_ENV_KEYS: Final = (
 
 def sanitized_native_environment(source: dict[str, str] | None = None) -> dict[str, str]:
     """Return an environment safe for launching distro-native GTK/Ayatana helpers."""
-
     env = dict(os.environ if source is None else source)
     for key in _UNSAFE_NATIVE_ENV_KEYS:
         env.pop(key, None)
@@ -36,6 +38,36 @@ def sanitized_native_environment(source: dict[str, str] | None = None) -> dict[s
             env.pop(key, None)
     env["PYTHONUNBUFFERED"] = "1"
     return env
+
+
+class BoundedDiagnosticBuffer:
+    """Bounded recent text buffer for long-running helper diagnostics."""
+
+    def __init__(self, *, max_lines: int = NATIVE_STDERR_MAX_LINES) -> None:
+        if max_lines <= 0:
+            raise ValueError("diagnostic buffer max_lines must be positive")
+        self._lines: deque[str] = deque(maxlen=max_lines)
+        self._lock = RLock()
+
+    def append(self, line: str) -> None:
+        normalized = line.rstrip("\r\n")[-NATIVE_STDERR_MAX_CHARS_PER_LINE:]
+        if not normalized:
+            return
+        with self._lock:
+            self._lines.append(normalized)
+
+    def text(self) -> str:
+        with self._lock:
+            return "\n".join(self._lines)
+
+    def line_count(self) -> int:
+        with self._lock:
+            return len(self._lines)
+
+
+def dynamic_label_guide(previous: str, rendered: str) -> str:
+    """Keep the longest runtime label seen without fixed window-name assumptions."""
+    return rendered if len(rendered) >= len(previous) else previous
 
 
 @runtime_checkable
@@ -80,8 +112,7 @@ def _helper_path() -> Path:
 
 
 def ayatana_availability(system_python: str = SYSTEM_PYTHON) -> NativeIndicatorAvailability:
-    """Probe distro-provided PyGObject/Ayatana using system Python, not the uv environment."""
-
+    """Probe distro-provided PyGObject/Ayatana using system Python, not uv."""
     if not Path(system_python).is_file():
         return NativeIndicatorAvailability(False, f"system Python not found: {system_python}")
     helper = _helper_path()
@@ -133,6 +164,9 @@ class AyatanaHelperIndicator:
         if on_settings is not None:
             self._callbacks["settings"] = on_settings
 
+        self._stderr_buffer = BoundedDiagnosticBuffer()
+        self._stderr_thread: Thread | None = None
+        self._label_guide = ""
         self._tmpdir = TemporaryDirectory(prefix="codexbar-indicator-")
         icon_path = Path(self._tmpdir.name) / "codexbar.png"
         icon_path.write_bytes(icon_png)
@@ -151,19 +185,32 @@ class AyatanaHelperIndicator:
             self._tmpdir.cleanup()
             raise
 
+        self._start_stderr_drain()
         try:
             self._await_ready(timeout_seconds=2.0)
         except Exception:
             self._terminate_process()
+            self._join_stderr_drain()
             self._tmpdir.cleanup()
             raise
+
+    @property
+    def recent_stderr(self) -> str:
+        return self._stderr_buffer.text()
 
     def show(self) -> None:
         return None
 
     def set_glance(self, text: str, *, stale: bool = False) -> None:
         rendered = f"{text} · stale" if stale else text
-        self._send({"command": "set_glance", "text": rendered, "guide": NATIVE_LABEL_GUIDE})
+        self._label_guide = dynamic_label_guide(self._label_guide, rendered)
+        self._send(
+            {
+                "command": "set_glance",
+                "text": rendered,
+                "guide": self._label_guide,
+            }
+        )
 
     def pump_events(self) -> None:
         stdout = self._process.stdout
@@ -194,7 +241,33 @@ class AyatanaHelperIndicator:
                 self._process.wait(timeout=1.0)
             except (BrokenPipeError, subprocess.TimeoutExpired):
                 self._terminate_process()
+        self._join_stderr_drain()
         self._tmpdir.cleanup()
+
+    def _start_stderr_drain(self) -> None:
+        stderr = self._process.stderr
+        if stderr is None:
+            return
+        thread = Thread(
+            target=self._drain_stderr,
+            args=(stderr,),
+            name="codexbar-native-stderr",
+            daemon=True,
+        )
+        self._stderr_thread = thread
+        thread.start()
+
+    def _drain_stderr(self, stderr: TextIO) -> None:
+        try:
+            for line in stderr:
+                self._stderr_buffer.append(line)
+        except (OSError, ValueError):
+            return
+
+    def _join_stderr_drain(self) -> None:
+        thread = self._stderr_thread
+        if thread is not None and thread.is_alive():
+            thread.join(timeout=0.2)
 
     def _await_ready(self, *, timeout_seconds: float) -> None:
         stdout = self._process.stdout
@@ -229,13 +302,24 @@ class AyatanaHelperIndicator:
         raise RuntimeError(self._startup_failure_message("timed out waiting for helper readiness"))
 
     def _startup_failure_message(self, prefix: str) -> str:
-        stderr = self._process.stderr
-        detail = ""
-        if stderr is not None and self._process.poll() is not None:
-            try:
-                detail = stderr.read().strip()
-            except OSError:
-                detail = ""
+        buffer = getattr(self, "_stderr_buffer", None)
+        if isinstance(buffer, BoundedDiagnosticBuffer):
+            thread = getattr(self, "_stderr_thread", None)
+            if (
+                isinstance(thread, Thread)
+                and thread.is_alive()
+                and self._process.poll() is not None
+            ):
+                thread.join(timeout=0.2)
+            detail = buffer.text().strip()
+        else:
+            stderr = self._process.stderr
+            detail = ""
+            if stderr is not None and self._process.poll() is not None:
+                try:
+                    detail = stderr.read().strip()
+                except (OSError, ValueError):
+                    detail = ""
         return f"{prefix}: {detail}" if detail else prefix
 
     def _terminate_process(self) -> None:
@@ -262,7 +346,6 @@ def run_indicator_diagnostics(
     timeout_seconds: float = 8.0,
 ) -> IndicatorDiagnosticReport:
     """Run the native helper in diagnostic mode and return structured step results."""
-
     helper = _helper_path()
     preflight: list[IndicatorDiagnosticStep] = []
     if not Path(system_python).is_file():
@@ -288,13 +371,19 @@ def run_indicator_diagnostics(
         )
     except subprocess.TimeoutExpired as exc:
         return IndicatorDiagnosticReport(
-            tuple(preflight + [IndicatorDiagnosticStep("helper-diagnostic", False, "timeout")]),
+            tuple(
+                preflight
+                + [IndicatorDiagnosticStep("helper-diagnostic", False, "timeout")]
+            ),
             124,
             str(exc),
         )
     except OSError as exc:
         return IndicatorDiagnosticReport(
-            tuple(preflight + [IndicatorDiagnosticStep("helper-diagnostic", False, str(exc))]),
+            tuple(
+                preflight
+                + [IndicatorDiagnosticStep("helper-diagnostic", False, str(exc))]
+            ),
             2,
             str(exc),
         )
@@ -304,7 +393,9 @@ def run_indicator_diagnostics(
         try:
             message = json.loads(raw)
         except json.JSONDecodeError:
-            steps.append(IndicatorDiagnosticStep("helper-output", False, f"invalid JSON: {raw}"))
+            steps.append(
+                IndicatorDiagnosticStep("helper-output", False, f"invalid JSON: {raw}")
+            )
             continue
         if message.get("type") != "diagnostic":
             continue
@@ -312,14 +403,26 @@ def run_indicator_diagnostics(
             IndicatorDiagnosticStep(
                 name=str(message.get("step", "unknown")),
                 ok=bool(message.get("ok", False)),
-                detail=str(message["detail"]) if message.get("detail") is not None else None,
+                detail=(
+                    str(message["detail"])
+                    if message.get("detail") is not None
+                    else None
+                ),
             )
         )
     if not any(step.name == "glib-loop" for step in steps):
         steps.append(
-            IndicatorDiagnosticStep("helper-diagnostic", False, "diagnostic did not complete")
+            IndicatorDiagnosticStep(
+                "helper-diagnostic",
+                False,
+                "diagnostic did not complete",
+            )
         )
-    return IndicatorDiagnosticReport(tuple(steps), completed.returncode, completed.stderr.strip())
+    return IndicatorDiagnosticReport(
+        tuple(steps),
+        completed.returncode,
+        completed.stderr.strip(),
+    )
 
 
 def create_ayatana_indicator(

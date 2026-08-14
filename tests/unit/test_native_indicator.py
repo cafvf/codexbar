@@ -16,8 +16,17 @@ def test_native_indicator_availability_is_explicit_value_object() -> None:
     assert unavailable.reason == "missing binding"
 
 
-def test_native_label_guide_covers_longest_expected_two_window_label() -> None:
-    assert native_indicator.NATIVE_LABEL_GUIDE == "5h: 100% · W: 100% · stale"
+def test_native_label_guide_tracks_longest_runtime_label() -> None:
+    first = native_indicator.dynamic_label_guide("", "5h: 100% · W: 100%")
+    second = native_indicator.dynamic_label_guide(first, "5h: 1%")
+    third = native_indicator.dynamic_label_guide(
+        second,
+        "Dynamic long quota window: 100% · stale",
+    )
+
+    assert first == "5h: 100% · W: 100%"
+    assert second == first
+    assert third == "Dynamic long quota window: 100% · stale"
 
 
 def test_availability_uses_system_python_probe(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -72,6 +81,7 @@ def test_helper_indicator_sends_only_glance_payload(monkeypatch: pytest.MonkeyPa
     payload = json.loads(payload_text)
     assert payload["command"] == "set_glance"
     assert payload["text"] == "5h: 73% · W: 41%"
+    assert payload["guide"] == "5h: 73% · W: 41%"
     assert "token" not in payload_text.lower()
     assert "credential" not in payload_text.lower()
 
@@ -174,7 +184,11 @@ def test_indicator_diagnostics_parses_structured_helper_steps(
     report = native_indicator.run_indicator_diagnostics("/usr/bin/python3")
 
     assert report.ok is True
-    assert [step.name for step in report.steps][-3:] == ["gi-import", "ayatana-import", "glib-loop"]
+    assert [step.name for step in report.steps][-3:] == [
+        "gi-import",
+        "ayatana-import",
+        "glib-loop",
+    ]
 
 
 def test_indicator_diagnostics_rejects_incomplete_helper_output(
@@ -280,7 +294,9 @@ def test_helper_indicator_launches_with_sanitized_environment(
     indicator.close()
 
 
-def test_indicator_diagnostics_uses_sanitized_environment(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_indicator_diagnostics_uses_sanitized_environment(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     monkeypatch.setattr(Path, "is_file", lambda self: True)
     run = Mock(
         return_value=Mock(

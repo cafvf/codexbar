@@ -3,6 +3,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from decimal import Decimal
 
+from PySide6.QtCore import QTimer
 from PySide6.QtWidgets import (
     QFrame,
     QLabel,
@@ -12,19 +13,14 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from codexbar.application.account_operations import AccountOperationClosedError
-from codexbar.application.redeem import (
-    RedeemBeginError,
-    RedeemProcessManager,
-    RedeemRecoveryError,
-    RedeemResult,
+from codexbar.application.redeem import RedeemProcessManager, RedeemResult
+from codexbar.application.redeem_execution import (
+    RedeemExecutionController,
+    RedeemExecutionPhase,
 )
 from codexbar.application.reset_events import RedeemAttemptId
-from codexbar.domain.errors import CodexBarError
 from codexbar.domain.models import UsageWindowId
 from codexbar.domain.reset import ResetCreditId
-from codexbar.ui.context_panel import HistoricalContextPanel
-from codexbar.ui.context_viewmodel import ContextPresenter
 from codexbar.ui.controller import TrayViewState
 from codexbar.ui.current_account_viewmodel import (
     CurrentAccountPresenter,
@@ -84,25 +80,36 @@ class BudgetPanel(QFrame):
             )
             return
 
-        labels = {
-            window.window_id: window.label
-            for window in state.usage.windows
-        }
+        labels = {window.window_id: window.label for window in state.usage.windows}
         lines: list[str] = []
         for budget in state.budget.windows:
             label = labels.get(budget.window_id, budget.window_id.value)
-            reserve = (
-                "Not set"
-                if budget.reserve is None
-                else f"{_percent(budget.reserve.value)}%"
-            )
             status = _budget_status_text(budget.status.value)
+            if budget.reserve is None:
+                lines.extend(
+                    (
+                        label,
+                        f"  Remaining: {_percent(budget.remaining.value)}%",
+                        "  Reserve policy: Not configured",
+                        "  Available above reserve: Not applicable",
+                        f"  Status: {status}",
+                        "  Configure a reserve in Settings to calculate reserve headroom.",
+                        "",
+                    )
+                )
+                continue
+
+            headroom = (
+                "Not applicable"
+                if budget.headroom is None
+                else f"{_percent(budget.headroom.value)}%"
+            )
             lines.extend(
                 (
                     label,
                     f"  Remaining: {_percent(budget.remaining.value)}%",
-                    f"  Reserved: {reserve}",
-                    f"  Available to use: {_percent(budget.headroom.value)}%",
+                    f"  Reserve: {_percent(budget.reserve.value)}%",
+                    f"  Available above reserve: {headroom}",
                     f"  Status: {status}",
                     "",
                 )
@@ -120,16 +127,23 @@ class BudgetPanel(QFrame):
 class RedeemPanel(QFrame):
     def __init__(
         self,
-        manager: RedeemProcessManager | None,
+        manager: RedeemProcessManager | None = None,
         *,
+        controller: RedeemExecutionController | None = None,
         on_changed: Callable[[RedeemResult], None] | None = None,
         parent: QWidget | None = None,
     ) -> None:
         super().__init__(parent)
-        self._manager = manager
+        self._controller = (
+            controller
+            if controller is not None
+            else RedeemExecutionController(manager)
+            if manager is not None
+            else None
+        )
         self._on_changed = on_changed
         self._state: CurrentAccountViewState | None = None
-        self._active = False
+        self._seen_result_generation = 0
 
         self.setFrameShape(QFrame.Shape.StyledPanel)
         layout = QVBoxLayout(self)
@@ -144,45 +158,57 @@ class RedeemPanel(QFrame):
         self._redeem.clicked.connect(self._confirm_redeem)
         self._retry.clicked.connect(self._confirm_retry)
 
+        self._poll_timer = QTimer(self)
+        self._poll_timer.setInterval(25)
+        self._poll_timer.timeout.connect(self._poll_execution)
+
     def render_account_state(self, state: CurrentAccountViewState | None) -> None:
         self._state = state
-        manager = self._manager
-        if state is None or not state.redeem.available or manager is None:
+        controller = self._controller
+        if state is None or not state.redeem.available or controller is None:
             self._status.setText("Redeem unavailable.")
             self._redeem.setEnabled(False)
             self._retry.setEnabled(False)
             return
 
+        execution = controller.state
+        if execution.phase is RedeemExecutionPhase.RUNNING:
+            self._status.setText("Redeem operation in progress…")
+        elif execution.phase is RedeemExecutionPhase.ERROR:
+            self._status.setText(f"Redeem failed: {execution.error or 'unknown error'}")
+        elif execution.phase is RedeemExecutionPhase.RESULT and execution.result is not None:
+            self._status.setText(
+                f"Redeem result: {execution.result.attempt.status.value}"
+            )
+        else:
+            unresolved = state.redeem.unresolved
+            has_available_credit = (
+                state.reset.available_count is not None
+                and state.reset.available_count > 0
+            )
+            if unresolved:
+                self._status.setText(
+                    f"Unresolved attempt: {unresolved[0].attempt_id.value} "
+                    f"({unresolved[0].status.value})."
+                )
+            elif has_available_credit:
+                self._status.setText("Reset credit available for manual redemption.")
+            else:
+                self._status.setText("No reset credits available.")
+
         unresolved = state.redeem.unresolved
         has_available_credit = (
-            state.reset.available_count is not None
-            and state.reset.available_count > 0
+            state.reset.available_count is not None and state.reset.available_count > 0
         )
-
-        if unresolved:
-            self._status.setText(
-                f"Unresolved attempt: {unresolved[0].attempt_id.value} "
-                f"({unresolved[0].status.value})."
-            )
-        elif has_available_credit:
-            self._status.setText("Reset credit available for manual redemption.")
-        else:
-            self._status.setText("No reset credits available.")
-
         self._redeem.setEnabled(
-            not self._active
-            and not unresolved
-            and has_available_credit
+            not controller.busy and not unresolved and has_available_credit
         )
-        self._retry.setEnabled(not self._active and bool(unresolved))
+        self._retry.setEnabled(not controller.busy and bool(unresolved))
 
     def _confirm_redeem(self) -> None:
-        manager = self._manager
-        if manager is None or self._active:
-            return
-
+        controller = self._controller
         state = self._state
-        if state is None:
+        if controller is None or controller.busy or state is None:
             return
 
         credit_id: ResetCreditId | None = None
@@ -190,10 +216,7 @@ class RedeemPanel(QFrame):
         if state.reset.credits:
             credit = state.reset.credits[0]
             credit_id = ResetCreditId(credit.credit_id)
-            text = (
-                f"Redeem reset credit “{credit.title}” "
-                f"({credit.expiry_text})?"
-            )
+            text = f"Redeem reset credit “{credit.title}” ({credit.expiry_text})?"
         elif state.reset.available_count:
             text = (
                 "Redeem one reset credit? Per-credit details are unavailable; "
@@ -208,14 +231,15 @@ class RedeemPanel(QFrame):
         )
         if answer is not QMessageBox.StandardButton.Yes:
             return
-        self._run(lambda: manager.redeem(credit_id=credit_id))
+        if controller.start_redeem(credit_id=credit_id):
+            self._poll_timer.start()
+            self.render_account_state(state)
 
     def _confirm_retry(self) -> None:
-        manager = self._manager
+        controller = self._controller
         state = self._state
-        if manager is None or self._active or state is None:
+        if controller is None or controller.busy or state is None:
             return
-
         unresolved = state.redeem.unresolved
         if not unresolved:
             return
@@ -229,27 +253,27 @@ class RedeemPanel(QFrame):
         )
         if answer is not QMessageBox.StandardButton.Yes:
             return
-        self._run(lambda: manager.retry(attempt_id))
+        if controller.start_retry(attempt_id):
+            self._poll_timer.start()
+            self.render_account_state(state)
 
-    def _run(self, action: Callable[[], RedeemResult]) -> None:
-        self._active = True
-        self._redeem.setEnabled(False)
-        self._retry.setEnabled(False)
-        result: RedeemResult | None = None
-        try:
-            result = action()
-            self._status.setText(f"Redeem result: {result.attempt.status.value}")
-        except (
-            AccountOperationClosedError,
-            CodexBarError,
-            RedeemBeginError,
-            RedeemRecoveryError,
-        ) as exc:
-            self._status.setText(f"Redeem failed: {exc}")
-        finally:
-            self._active = False
-        if result is not None and self._on_changed is not None:
-            self._on_changed(result)
+    def _poll_execution(self) -> None:
+        controller = self._controller
+        if controller is None:
+            self._poll_timer.stop()
+            return
+        execution = controller.poll()
+        self.render_account_state(self._state)
+        if (
+            execution.phase is RedeemExecutionPhase.RESULT
+            and execution.result is not None
+            and execution.generation > self._seen_result_generation
+        ):
+            self._seen_result_generation = execution.generation
+            if self._on_changed is not None:
+                self._on_changed(execution.result)
+        if not controller.busy:
+            self._poll_timer.stop()
 
 
 class CurrentAccountPanel(RichUsagePanel):
@@ -258,28 +282,21 @@ class CurrentAccountPanel(RichUsagePanel):
         presenter: CurrentAccountPresenter,
         redeem_manager: RedeemProcessManager | None,
         *,
-        context_presenter: ContextPresenter | None = None,
+        redeem_controller: RedeemExecutionController | None = None,
         on_history: Callable[[UsageWindowId], None] | None = None,
         on_redeem_changed: Callable[[RedeemResult], None] | None = None,
     ) -> None:
         super().__init__(on_history=on_history)
         self._presenter = presenter
-        self.context_panel = (
-            HistoricalContextPanel(context_presenter, self)
-            if context_presenter is not None
-            else None
-        )
         self.reset_panel = ResetCreditsPanel(self)
         self.budget_panel = BudgetPanel(self)
         self.redeem_panel = RedeemPanel(
             redeem_manager,
+            controller=redeem_controller,
             on_changed=on_redeem_changed,
             parent=self,
         )
         insert_at = max(0, self._layout.count() - 1)
-        if self.context_panel is not None:
-            self._layout.insertWidget(insert_at, self.context_panel)
-            insert_at += 1
         self._layout.insertWidget(insert_at, self.reset_panel)
         self._layout.insertWidget(insert_at + 1, self.budget_panel)
         self._layout.insertWidget(insert_at + 2, self.redeem_panel)
@@ -287,21 +304,16 @@ class CurrentAccountPanel(RichUsagePanel):
     def render_state(self, state: TrayViewState) -> None:
         super().render_state(state)
         account = self._presenter.current()
-        if self.context_panel is not None:
-            self.context_panel.refresh()
         self.reset_panel.render_account_state(account)
         self.budget_panel.render_account_state(account)
         self.redeem_panel.render_account_state(account)
 
-    def current_usage_windows(
-        self,
-    ) -> tuple[tuple[UsageWindowId, str], ...]:
+    def current_usage_windows(self) -> tuple[tuple[UsageWindowId, str], ...]:
         account = self._presenter.current()
         if account is None:
             return ()
         return tuple(
-            (window.window_id, window.label)
-            for window in account.usage.windows
+            (window.window_id, window.label) for window in account.usage.windows
         )
 
 

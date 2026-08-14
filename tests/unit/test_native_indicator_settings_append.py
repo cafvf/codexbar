@@ -42,13 +42,15 @@ def test_helper_indicator_registers_settings_callback(
     indicator.close()
 
 
-def test_native_helper_menu_contract_includes_settings_and_history() -> None:
+def test_native_helper_menu_contract_includes_health_settings_and_history() -> None:
+    assert ("System health", "health") in MENU_ACTIONS
     assert ("Settings", "settings") in MENU_ACTIONS
     assert ("History", "history") in MENU_ACTIONS
     assert MENU_ACTIONS == (
         ("Refresh", "refresh"),
         ("Open details", "details"),
         ("History", "history"),
+        ("System health", "health"),
         ("Settings", "settings"),
         ("Quit", "quit"),
     )

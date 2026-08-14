@@ -20,7 +20,7 @@ class WindowBudget:
     window_id: UsageWindowId
     remaining: Fraction
     reserve: Fraction | None
-    headroom: Fraction
+    headroom: Fraction | None
     status: BudgetStatus
 
 
@@ -35,7 +35,7 @@ def calculate_window_budget(
             window_id=window_id,
             remaining=remaining,
             reserve=None,
-            headroom=Fraction(Decimal("0")),
+            headroom=None,
             status=BudgetStatus.NO_POLICY,
         )
 

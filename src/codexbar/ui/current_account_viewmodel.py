@@ -9,6 +9,7 @@ from codexbar.application.account import AccountRateLimitsObservation
 from codexbar.application.account_presentation import LatestAccountObservationReader
 from codexbar.application.budget import BudgetRuntime, WindowBudget
 from codexbar.application.redeem import RedeemAttempt, RedeemProcessManager
+from codexbar.application.redeem_execution import RedeemExecutionController
 from codexbar.application.reset_ledger import ResetLedgerError
 from codexbar.application.reset_monitor import (
     OpportunityPriority,
@@ -17,6 +18,7 @@ from codexbar.application.reset_monitor import (
     build_reset_situation,
 )
 from codexbar.application.reset_projection import ResetLedgerProjection
+from codexbar.application.runtime_health import RuntimeDiagnosticRegistry
 from codexbar.domain.models import Freshness
 from codexbar.domain.reset import (
     DetailCoverage,
@@ -25,6 +27,8 @@ from codexbar.domain.reset import (
     ResetCreditReadStatus,
 )
 from codexbar.domain.settings import AppSettings
+from codexbar.ui.context_controller import ContextController
+from codexbar.ui.system_health_viewmodel import SystemHealthPresenter
 from codexbar.ui.viewmodel import UsageViewModel, UsageViewState
 
 
@@ -97,6 +101,23 @@ class CurrentAccountPresenter:
         self._redeem_manager = redeem_manager
         self._policy = ResetOpportunityPolicy()
         self._clock = clock or (lambda: datetime.now(UTC))
+        self.runtime_context_controller: ContextController | None = None
+        self.runtime_redeem_controller: RedeemExecutionController | None = None
+        self.runtime_health_presenter: SystemHealthPresenter | None = None
+        self.runtime_diagnostics: RuntimeDiagnosticRegistry | None = None
+
+    def bind_runtime_surfaces(
+        self,
+        *,
+        context_controller: ContextController,
+        redeem_controller: RedeemExecutionController | None,
+        health_presenter: SystemHealthPresenter,
+        diagnostics: RuntimeDiagnosticRegistry,
+    ) -> None:
+        self.runtime_context_controller = context_controller
+        self.runtime_redeem_controller = redeem_controller
+        self.runtime_health_presenter = health_presenter
+        self.runtime_diagnostics = diagnostics
 
     def apply_settings(self, settings: AppSettings) -> None:
         self._budget_runtime.apply_settings(settings)

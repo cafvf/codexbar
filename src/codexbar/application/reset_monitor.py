@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from enum import StrEnum
+from typing import Final
 
 from codexbar.application.account import AccountRateLimitsObservation
 from codexbar.application.budget import BudgetRuntime, BudgetStatus, WindowBudget
@@ -14,6 +15,8 @@ WATCH_HORIZON = timedelta(hours=24)
 URGENT_HORIZON = timedelta(hours=6)
 SCHEDULED_RESET_NEAR = timedelta(hours=2)
 MEANINGFUL_HEADROOM_POINTS = 5
+RESET_MONITOR_PRODUCTION_ACTIVE: Final = False
+RESET_MONITOR_PRODUCT_STATUS: Final = "deferred"
 
 
 class ResetFactKind(StrEnum):
@@ -127,6 +130,7 @@ def _nearest_upcoming_expiry(
 def _has_meaningful_headroom(budgets: tuple[WindowBudget, ...]) -> bool:
     return any(
         budget.status is BudgetStatus.ABOVE_RESERVE
+        and budget.headroom is not None
         and budget.headroom.percent >= MEANINGFUL_HEADROOM_POINTS
         for budget in budgets
     )
@@ -141,6 +145,8 @@ def _has_near_scheduled_reset(situation: ResetSituation, now: datetime) -> bool:
 
 
 class ResetExpiryMonitor:
+    """Deferred primitive: present in source, deliberately not owned by v1.7 runtime."""
+
     def __init__(self) -> None:
         self._seen: set[str] = set()
         self._last_count: int | None = None

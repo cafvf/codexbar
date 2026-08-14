@@ -2,8 +2,14 @@ from __future__ import annotations
 
 from decimal import Decimal
 
+from PySide6.QtCore import QTimer
 from PySide6.QtWidgets import QFrame, QLabel, QVBoxLayout, QWidget
 
+from codexbar.ui.context_controller import (
+    ContextController,
+    ContextControllerPhase,
+    ContextControllerState,
+)
 from codexbar.ui.context_viewmodel import (
     ContextPresenter,
     ContextViewKind,
@@ -13,19 +19,23 @@ from codexbar.ui.context_viewmodel import (
 
 
 class HistoricalContextPanel(QFrame):
-    """Visually distinct descriptive Historical Context section for Open Details."""
+    """Async Historical Context surface; repository/summary work stays off Qt."""
 
     def __init__(
         self,
-        presenter: ContextPresenter,
+        controller: ContextController | ContextPresenter,
         parent: QWidget | None = None,
     ) -> None:
         super().__init__(parent)
-        self._presenter = presenter
+        self._controller = (
+            controller
+            if isinstance(controller, ContextController)
+            else ContextController(controller)
+        )
+        self._last_state: ContextControllerState | None = None
         self.setFrameShape(QFrame.Shape.StyledPanel)
         layout = QVBoxLayout(self)
-        title = QLabel("Historical context")
-        layout.addWidget(title)
+        layout.addWidget(QLabel("Historical context"))
         explanation = QLabel(
             "Descriptive comparison with independent retained historical cycles "
             "at a similar time before reset."
@@ -36,8 +46,28 @@ class HistoricalContextPanel(QFrame):
         self._body.setWordWrap(True)
         layout.addWidget(self._body)
 
+        self._poll_timer = QTimer(self)
+        self._poll_timer.setInterval(25)
+        self._poll_timer.timeout.connect(self._poll)
+
     def refresh(self) -> None:
-        self.render_state(self._presenter.current())
+        if self._controller.start():
+            self.render_controller_state(self._controller.state)
+        if self._controller.busy:
+            self._poll_timer.start()
+
+    def render_controller_state(self, state: ContextControllerState) -> None:
+        self._last_state = state
+        if state.phase is ContextControllerPhase.LOADING:
+            self._body.setText(state.message or "Loading historical context…")
+            return
+        if state.phase is ContextControllerPhase.UNAVAILABLE:
+            self._body.setText(
+                f"{state.message or 'Historical context is unavailable.'}\n"
+                "Comparable cycles: unavailable"
+            )
+            return
+        self.render_state(state.view)
 
     def render_state(self, state: ContextViewState) -> None:
         if not state.windows:
@@ -45,9 +75,14 @@ class HistoricalContextPanel(QFrame):
                 "No current usage observation yet.\nComparable cycles: unavailable"
             )
             return
+        self._body.setText("\n\n".join(_render_window(window) for window in state.windows))
 
-        blocks = [_render_window(window) for window in state.windows]
-        self._body.setText("\n\n".join(blocks))
+    def _poll(self) -> None:
+        state = self._controller.poll()
+        if state != self._last_state:
+            self.render_controller_state(state)
+        if not self._controller.busy:
+            self._poll_timer.stop()
 
 
 def _render_window(window: ContextWindowViewState) -> str:
@@ -58,14 +93,10 @@ def _render_window(window: ContextWindowViewState) -> str:
     ]
 
     if window.kind is ContextViewKind.SPARSE:
-        historical_range = (
-            f"{_percent(window.range_low)}–{_percent(window.range_high)}"
-        )
+        historical_range = f"{_percent(window.range_low)}–{_percent(window.range_high)}"
         lines.append(f"  Observed historical range: {historical_range}")
     elif window.kind is ContextViewKind.LIMITED:
-        historical_range = (
-            f"{_percent(window.range_low)}–{_percent(window.range_high)}"
-        )
+        historical_range = f"{_percent(window.range_low)}–{_percent(window.range_high)}"
         lines.extend(
             (
                 f"  Historical median: {_percent(window.median)}",
@@ -73,9 +104,7 @@ def _render_window(window: ContextWindowViewState) -> str:
             )
         )
     elif window.kind is ContextViewKind.ESTABLISHED:
-        middle_50 = (
-            f"{_percent(window.band_low)}–{_percent(window.band_high)}"
-        )
+        middle_50 = f"{_percent(window.band_low)}–{_percent(window.band_high)}"
         lines.extend(
             (
                 f"  Historical median: {_percent(window.median)}",

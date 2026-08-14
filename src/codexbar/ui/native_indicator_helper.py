@@ -22,6 +22,7 @@ MENU_ACTIONS = (
     ("Refresh", "refresh"),
     ("Open details", "details"),
     ("History", "history"),
+    ("System health", "health"),
     ("Settings", "settings"),
     ("Quit", "quit"),
 )
@@ -219,6 +220,10 @@ def main() -> int:
     history_item = Gtk.MenuItem(label="History")
     history_item.connect("activate", lambda *_: _emit("history"))
     menu.append(history_item)
+
+    health_item = Gtk.MenuItem(label="System health")
+    health_item.connect("activate", lambda *_: _emit("health"))
+    menu.append(health_item)
 
     settings_item = Gtk.MenuItem(label="Settings")
     settings_item.connect("activate", lambda *_: _emit("settings"))

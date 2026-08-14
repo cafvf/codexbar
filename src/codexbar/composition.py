@@ -19,6 +19,7 @@ from codexbar.application.history import HistoryError
 from codexbar.application.history_runtime import HistoryService
 from codexbar.application.ports import NotificationPort, UsageProvider
 from codexbar.application.redeem import RedeemProcessManager
+from codexbar.application.redeem_execution import RedeemExecutionController
 from codexbar.application.reset_ledger import (
     ResetEventRepository,
     ResetLedgerError,
@@ -27,8 +28,13 @@ from codexbar.application.reset_ledger import (
 from codexbar.application.reset_ledger_service import ResetLedgerService
 from codexbar.application.reset_projection import ResetLedgerProjection
 from codexbar.application.revisions import HistoryRevision
+from codexbar.application.runtime_health import (
+    RuntimeDiagnosticRegistry,
+    RuntimeHealthSnapshotProvider,
+)
 from codexbar.application.settings import GetSettings, SettingsRepository
 from codexbar.application.usage_adapter import AccountUsageProvider
+from codexbar.domain.diagnostics import RuntimeMetricCollector
 from codexbar.infrastructure.account_reader import CodexAccountRateLimitsReader
 from codexbar.infrastructure.context_history import SqliteContextHistoryRepository
 from codexbar.infrastructure.history_paths import history_database_path
@@ -47,9 +53,11 @@ from codexbar.infrastructure.reset_consumer import CodexResetCreditConsumer
 from codexbar.infrastructure.reset_event_paths import reset_ledger_database_path
 from codexbar.infrastructure.reset_event_sqlite import SqliteResetEventRepository
 from codexbar.infrastructure.settings import JsonSettingsRepository
+from codexbar.ui.context_controller import ContextController
 from codexbar.ui.context_viewmodel import ContextPresenter
 from codexbar.ui.current_account_viewmodel import CurrentAccountPresenter
 from codexbar.ui.history_controller import HistoryController
+from codexbar.ui.system_health_viewmodel import SystemHealthPresenter
 
 
 @dataclass(frozen=True, slots=True)
@@ -73,12 +81,20 @@ class GuiRuntime:
     history_controller: HistoryController
     context_service: HistoricalContextService
     context_presenter: ContextPresenter
+    context_controller: ContextController
     operation_coordinator: AccountOperationCoordinator
     presenter: CurrentAccountPresenter
+    runtime_metrics: RuntimeMetricCollector
+    runtime_diagnostics: RuntimeDiagnosticRegistry
+    health_presenter: SystemHealthPresenter
     reset_ledger_service: ResetLedgerService | None = None
     redeem_manager: RedeemProcessManager | None = None
+    redeem_controller: RedeemExecutionController | None = None
 
     def close(self) -> None:
+        self.context_controller.close()
+        if self.redeem_controller is not None:
+            self.redeem_controller.close()
         self.history_controller.close()
         self.operation_coordinator.close()
 
@@ -165,6 +181,8 @@ def build_gui_runtime(*, mock: bool = False) -> GuiRuntime:
     settings = GetSettings(settings_repository).execute().settings
     notifier = NotifySendNotificationAdapter()
     coordinator = AccountOperationCoordinator()
+    runtime_metrics = RuntimeMetricCollector()
+    runtime_diagnostics = RuntimeDiagnosticRegistry()
     reader, consumer = _account_adapters(mock=mock)
 
     capturing_reader = CapturingAccountRateLimitsReader(
@@ -185,6 +203,14 @@ def build_gui_runtime(*, mock: bool = False) -> GuiRuntime:
         if reset.repository is not None
         else None
     )
+    redeem_controller = (
+        RedeemExecutionController(
+            redeem_manager,
+            runtime_metrics=runtime_metrics,
+        )
+        if redeem_manager is not None
+        else None
+    )
     presenter = CurrentAccountPresenter(
         latest_reader,
         settings,
@@ -196,6 +222,24 @@ def build_gui_runtime(*, mock: bool = False) -> GuiRuntime:
         history.context_service,
         history_revision_reader=_history_revision_reader(history.service),
     )
+    context_controller = ContextController(
+        context_presenter,
+        runtime_metrics=runtime_metrics,
+    )
+    health_provider = RuntimeHealthSnapshotProvider(
+        latest_reader,
+        history.service,
+        context_controller,
+        runtime_metrics,
+        runtime_diagnostics,
+    )
+    health_presenter = SystemHealthPresenter(health_provider)
+    presenter.bind_runtime_surfaces(
+        context_controller=context_controller,
+        redeem_controller=redeem_controller,
+        health_presenter=health_presenter,
+        diagnostics=runtime_diagnostics,
+    )
 
     return GuiRuntime(
         provider=AccountUsageProvider(coordinated_reader),
@@ -204,8 +248,13 @@ def build_gui_runtime(*, mock: bool = False) -> GuiRuntime:
         history_controller=history.controller,
         context_service=history.context_service,
         context_presenter=context_presenter,
+        context_controller=context_controller,
         operation_coordinator=coordinator,
-        reset_ledger_service=reset.service,
         presenter=presenter,
+        runtime_metrics=runtime_metrics,
+        runtime_diagnostics=runtime_diagnostics,
+        health_presenter=health_presenter,
+        reset_ledger_service=reset.service,
         redeem_manager=redeem_manager,
+        redeem_controller=redeem_controller,
     )

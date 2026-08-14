@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from decimal import Decimal
 from enum import StrEnum
 
+from codexbar.application.account import AccountRateLimitsObservation
 from codexbar.application.account_presentation import LatestAccountObservationReader
 from codexbar.application.context import (
     HistoricalContextReason,
@@ -12,7 +13,7 @@ from codexbar.application.context import (
     HistoricalContextService,
     HistoricalContextState,
 )
-from codexbar.application.revisions import HistoryRevision
+from codexbar.application.revisions import CurrentRevision, HistoryRevision
 from codexbar.domain.context import ContextCoverage, ContextRank
 from codexbar.domain.models import UsageWindowId
 
@@ -45,8 +46,19 @@ class ContextViewState:
     windows: tuple[ContextWindowViewState, ...]
 
 
+@dataclass(frozen=True, slots=True)
+class ContextPresentationRequest:
+    observation: AccountRateLimitsObservation
+    current_revision: CurrentRevision
+    history_revision: HistoryRevision
+
+    @property
+    def identity(self) -> tuple[CurrentRevision, HistoryRevision]:
+        return self.current_revision, self.history_revision
+
+
 class ContextPresenter:
-    """Present Context from the already-captured latest account observation."""
+    """Present Context from a coherently captured Current/History revision pair."""
 
     def __init__(
         self,
@@ -60,39 +72,51 @@ class ContextPresenter:
         self._history_revision_reader = history_revision_reader
 
     def current(self) -> ContextViewState:
-        observation = self._latest_reader.latest
-        if observation is None:
+        """Compatibility path for v1.6/unit callers; production Qt uses ContextController."""
+        request = self.capture_request()
+        if request is None:
             return ContextViewState(())
+        return self.evaluate_request(request)
 
+    def capture_request(self) -> ContextPresentationRequest | None:
+        observation, current_revision = self._latest_reader.capture()
+        if observation is None:
+            return None
+        revision_reader = self._history_revision_reader
+        history_revision = revision_reader() if revision_reader is not None else HistoryRevision()
+        return ContextPresentationRequest(
+            observation=observation,
+            current_revision=current_revision,
+            history_revision=history_revision,
+        )
+
+    def current_identity(self) -> tuple[CurrentRevision, HistoryRevision] | None:
+        request = self.capture_request()
+        return None if request is None else request.identity
+
+    def evaluate_request(self, request: ContextPresentationRequest) -> ContextViewState:
+        observation = request.observation
+        revision_reader = self._history_revision_reader
         return ContextViewState(
             tuple(
                 self._window_state(
                     label=window.label,
-                    result=self._evaluate_window(window.id),
+                    result=(
+                        self._service.evaluate(
+                            current=observation.usage,
+                            window_id=window.id,
+                        )
+                        if revision_reader is None
+                        else self._service.evaluate(
+                            current=observation.usage,
+                            window_id=window.id,
+                            current_revision=request.current_revision,
+                            history_revision=request.history_revision,
+                        )
+                    ),
                 )
                 for window in observation.usage.windows
             )
-        )
-
-    def _evaluate_window(self, window_id: UsageWindowId) -> HistoricalContextResult:
-        observation = self._latest_reader.latest
-        if observation is None:
-            raise AssertionError("Context evaluation requires a latest observation")
-
-        revision_reader = self._history_revision_reader
-        if revision_reader is None:
-            # Preserve the v1.6 presenter construction contract for unit callers that
-            # do not participate in the v1.7 runtime revision model.
-            return self._service.evaluate(
-                current=observation.usage,
-                window_id=window_id,
-            )
-
-        return self._service.evaluate(
-            current=observation.usage,
-            window_id=window_id,
-            current_revision=self._latest_reader.current_revision,
-            history_revision=revision_reader(),
         )
 
     @staticmethod

@@ -99,7 +99,27 @@ credit was naturally present. No credit was created or spent for test theater.
 Phase G established the hosted Python 3.12/3.13/3.14 matrix and uv-tool version
 mode. The final v1.7.0 release-prep commit must rerun that hosted gate.
 
-Final hosted conclusion: **PENDING**.
+Final hosted conclusion: **SUCCESS**.
+
+Release-prep hosted evidence:
+
+- commit: `919de086839910d7d8823aa7b5e5c1d4dbf5bfe9`;
+- workflow run: `31831752049`;
+- event: push to `main`;
+- Python 3.12: SUCCESS;
+- Python 3.13: SUCCESS;
+- Python 3.14: SUCCESS;
+- isolated uv-tool version mode: SUCCESS.
+
+Every Python-matrix job passed Test, Ruff, strict mypy, Compile, architecture
+gates and project/editable version-authority validation. The uv-tool job passed
+the combined uv-run/editable/isolated-tool mode check.
+
+Remote `main` was verified at the release-prep commit.
+
+A final documentation-only closure commit may follow this record. That exact
+closure commit MUST pass the same hosted CI before annotated tag creation; this is
+an operational tag gate and does not require another evidence-document rewrite.
 
 ## Release decision
 

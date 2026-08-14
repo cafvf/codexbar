@@ -142,3 +142,27 @@ Evidence:
 
 TASK-789 remains pending until the release-prep commit is pushed and hosted CI is
 green on that exact commit. Tag creation remains prohibited before that closure.
+
+## TASK-789 hosted closure
+
+Release-prep commit:
+
+`919de086839910d7d8823aa7b5e5c1d4dbf5bfe9`
+
+Remote `main`: verified at the same commit.
+
+GitHub Actions run `31831752049`: **SUCCESS**.
+
+Hosted jobs:
+
+- Python 3.12 — SUCCESS;
+- Python 3.13 — SUCCESS;
+- Python 3.14 — SUCCESS;
+- uv tool version mode — SUCCESS.
+
+The release-prep hosted gate is therefore closed.
+
+A documentation-only evidence-closure commit may now be created and pushed. The
+annotated `v1.7.0` tag remains prohibited until CI on that exact final closure
+commit is also green. No further documentation mutation is required after that
+last operational verification.

@@ -20,7 +20,7 @@ Baseline: 1.6.0 — Context
 | native hardening | REQ-NATIVE-001..003 | bounded helper stderr, dynamic guide, Qt fallback | validated |
 | deferred reset monitor | REQ-RESET-MONITOR-001 | explicit inactive runtime health state | validated |
 | version authority | REQ-VERSION-001..002 | `pyproject.toml` + importlib package metadata + three execution modes | validated locally at 1.7.0 |
-| hosted CI | REQ-CI-001..003 | Python 3.12/3.13/3.14 matrix; pytest/Ruff/mypy/compileall | pending final 1.7.0 run |
+| hosted CI | REQ-CI-001..003 | Python 3.12/3.13/3.14 matrix; pytest/Ruff/mypy/compileall | validated on release-prep commit |
 | target performance | REQ-PERF-001..006 | Phase A/H characterizers + IPC characterization | validated |
 | evidence-gated maintenance | REQ-EVIDENCE-001..004 | explicit retain/change ADR outcomes | validated |
 | v1.6 regression | REQ-REGRESSION-001 | full regression suite + physical target session | validated |

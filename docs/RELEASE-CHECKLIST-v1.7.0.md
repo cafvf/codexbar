@@ -56,16 +56,16 @@ Status: release prep
 
 ## Hosted gate
 
-- [ ] Python 3.12 job green on release-prep commit.
-- [ ] Python 3.13 job green on release-prep commit.
-- [ ] Python 3.14 job green on release-prep commit.
-- [ ] isolated uv-tool version-mode job green on release-prep commit.
+- [x] Python 3.12 job green on release-prep commit.
+- [x] Python 3.13 job green on release-prep commit.
+- [x] Python 3.14 job green on release-prep commit.
+- [x] isolated uv-tool version-mode job green on release-prep commit.
 
 ## Git closure
 
-- [ ] final release-prep commit created and pushed.
-- [ ] remote `main` verified at release-prep commit.
-- [ ] hosted CI conclusion is success.
+- [x] final release-prep commit created and pushed.
+- [x] remote `main` verified at release-prep commit.
+- [x] hosted CI conclusion is success.
 - [ ] working tree clean apart from intentionally excluded user-local work, if any.
 - [ ] annotated tag `v1.7.0` created at the verified release commit.
 - [ ] tag pushed to `origin`.

@@ -16,7 +16,7 @@ Last reviewed: 2026-08-14
 | v1.5 | Control | What deterministic reserve/reset actions are available? | Released |
 | v1.6 | Context | How does Current compare with independent prior cycles? | Released |
 | v1.7 | Diagnose | Is CodexBar healthy, coherent, responsive, and explainable? | Released |
-| v1.8 | Plan | How does Current compare with explicit user-defined checkpoints and reserves? | Proposed |
+| v1.8 | Plan | How does Current compare with explicit user-defined checkpoints and reserves? | Specification frozen |
 | v1.9 | Explore | Why did Context choose this evidence and how do cycles compare? | Proposed |
 | v2.0 | Activity | How does observed Codex activity organize into sessions/work patterns? | Research horizon |
 
@@ -67,6 +67,8 @@ See `docs/specs/v1.7/PLANNING.md`.
 
 ## v1.8 — Plan
 
+Status: specification frozen for implementation.
+
 Primary intent:
 
 > Let the user define explicit factual operating targets for each dynamic usage
@@ -76,22 +78,21 @@ Product question:
 
 > How does Current compare with the plan I explicitly configured for this window?
 
-Proposed product direction:
+Frozen v1.8 direction:
 
-- user-defined plan policies by `UsageWindowId`;
-- explicit checkpoint floors expressed in time-to-reset coordinates;
-- deterministic plan status relative to each applicable checkpoint;
-- richer reserve policies without changing Current authority;
-- configurable factual notification rules derived from Current + explicit policy;
+- explicit checkpoint policy by opaque `UsageWindowId`;
+- checkpoint floors expressed as whole-second time-to-reset coordinates plus minimum remaining fraction;
+- existing `usage_reserves` remains the sole reserve authority;
+- deterministic effective floor and signed Plan margin from Current + explicit policy;
+- one optional factual notification category for transition into `BELOW`;
 - clear distinction between reserve, checkpoint and notification semantics;
-- optional runtime integration of reset-credit expiry/count-change facts only when
-  supported capability evidence is available.
+- no reset-credit fact monitoring is required by the core v1.8 Plan scope.
 
 Conceptual policy model:
 
-- `reserve_floor`: how much capacity the user intends to preserve;
-- `checkpoints[]`: minimum remaining fraction at explicit time-to-reset positions;
-- `notification_rules[]`: factual conditions under which the user wants an alert.
+- existing `usage_reserves`: how much capacity the user intends to preserve;
+- `usage_plan_checkpoints[]`: explicit `time_to_reset_seconds + minimum_remaining` targets;
+- `plan_breach_notifications_enabled`: fixed factual below-plan notification opt-in.
 
 Architectural boundaries:
 

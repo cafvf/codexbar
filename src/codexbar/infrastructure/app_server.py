@@ -275,6 +275,12 @@ def _parse_rate_limit_snapshot(
             continue
         windows.append(_parse_window(_mapping(raw, f"rateLimits.{slot}")))
 
+    window_ids = [window.id.value for window in windows]
+    if len(window_ids) != len(set(window_ids)):
+        raise UsageSchemaError(
+            "rate limit windows must have unique identities derived from windowDurationMins"
+        )
+
     reached_type_raw = rate_limits.get("rateLimitReachedType")
     reached_type = None if reached_type_raw is None else str(reached_type_raw)
     return UsageSnapshot(

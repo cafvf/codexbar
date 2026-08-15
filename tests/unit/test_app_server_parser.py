@@ -37,3 +37,17 @@ def test_empty_but_valid_rate_limits_snapshot_is_preserved() -> None:
     }
     snapshot = parse_rate_limits_response(payload, observed_at=NOW)
     assert snapshot.windows == ()
+
+
+def test_duplicate_normalized_window_ids_fail_as_schema_error() -> None:
+    payload = {
+        "result": {
+            "rateLimits": {
+                "primary": {"usedPercent": 10, "windowDurationMins": 300},
+                "secondary": {"usedPercent": 20, "windowDurationMins": 300},
+            }
+        }
+    }
+
+    with pytest.raises(UsageSchemaError, match="unique identities"):
+        parse_rate_limits_response(payload, observed_at=NOW)

@@ -1,80 +1,68 @@
 # CodexBar v1.8 — Plan Planning Record
 
-Status: product planning concluded; requirements drafting is next  
-Theme: Plan  
-Validated implementation baseline: v1.7.0 — Diagnose  
-Planning baseline: 495b91c23f6d1f65e5f596280ec39730ede7c9df
+Status: planning/specification complete; frozen for implementation
+Theme: Plan
+Validated release baseline: v1.7.0 — Diagnose
+Initial planning baseline: `495b91c23f6d1f65e5f596280ec39730ede7c9df`
+Product-spec freeze commit: `1d9f53150adb1aa6a7fb4573dab023c8bd4f4f7c`
 
 ## Planning outcome
 
-The roadmap inversion is already committed:
+The roadmap order remains:
 
 - v1.8 — Plan;
 - v1.9 — Explore;
 - v2.0 — Activity research horizon.
 
-v1.8 is intentionally sequenced before Explore because Plan depends primarily on
-capabilities already stabilized through v1.7:
+Plan is intentionally before Explore because it depends primarily on capabilities already stabilized
+through v1.7: authoritative Current, dynamic `UsageWindowId`, Settings, reserve/Budget semantics,
+factual alerts, reset-credit safety, Current Details composition, diagnostics and release harnesses.
 
-- authoritative Current;
-- dynamic `UsageWindowId`;
-- Settings;
-- existing reserve/Budget semantics;
-- factual alerts;
-- reset-credit safety contracts;
-- responsive runtime foundations;
-- diagnostics/release gates.
-
-Plan does not require richer Historical Context exploration.
+Historical Context is not a Plan authority or dependency.
 
 ## Frozen product model
 
-The planning review approved these central semantics:
+1. Current plus explicit Settings are the only Plan authorities.
+2. Existing reserve remains canonical; Plan does not own a second reserve.
+3. Checkpoints are explicit per-window `(time_to_reset, minimum_remaining)` values.
+4. Persisted checkpoint coordinates use whole integer seconds; the shared `TimeToReset` quantity remains generic.
+5. Checkpoint selection is a step function with equality inclusive and no interpolation.
+6. Effective floor is the strongest applicable reserve/checkpoint floor.
+7. Plan margin is signed and distinct from Budget headroom.
+8. Compliance is `ABOVE`, `AT` or `BELOW` only when an effective floor exists.
+9. Checkpoint resolution is explicit and orthogonal to compliance/freshness.
+10. STALE observations never advance Plan alerts and are not presented as current compliance.
+11. One fixed Plan-breach notification category is opt-in and defaults off on legacy settings.
+12. No forecast, probability, automatic policy adaptation or automatic redeem exists.
 
-1. Current plus explicit user settings are the only Plan authorities.
-2. Existing reserve remains canonical; Plan does not create a second reserve.
-3. Checkpoints are `(time_to_reset, minimum_remaining)` values per
-   `UsageWindowId`.
-4. Checkpoint evaluation is a step function with no interpolation.
-5. The effective floor is the maximum applicable reserve/checkpoint floor.
-6. Plan margin is signed.
-7. Above, at and below Plan remain semantically distinct.
-8. Missing reset time causes partial capability degradation, not inference.
-9. Duplicate checkpoint times are invalid; non-monotonic floors are allowed.
-10. Canonical checkpoint duration uses integer seconds.
-11. Settings evolution is backward-compatible and does not rewrite on read.
-12. Stale snapshots may be displayed but do not cause Plan side effects.
-13. The only core new Plan notification is transition into below-Plan.
-14. History and Historical Context cannot influence Plan.
-15. Plan does not predict future compliance or exhaustion.
-16. Reset credits do not alter Plan status and automatic redeem remains forbidden.
-17. Budget and Control remain independent from Plan.
-18. No Plan-specific historical persistence is authorized.
+## Complexity outcome
 
-Detailed authoritative wording is in `PRODUCT.md` and `DECISIONS.md`.
+Accepted new runtime semantics are deliberately small:
 
-## Scope status
+- pure Plan evaluation;
+- in-memory Plan-breach transition tracking.
 
-`CANDIDATE-SCOPE.md` records the resolved candidate scope.
+Everything else extends existing owners: AppSettings/JsonSettingsRepository, Settings UI/actions,
+CurrentAccountPresenter/Current Details, TrayController adoption path and NotificationPort.
 
-Reset-credit expiry/count-change runtime notifications remain evidence-gated and
-are not required for release success.
+Rejected as unjustified:
 
-## Next specification stage
+- Plan repository/database/Event Store;
+- Plan cache/revision;
+- Plan scheduler/timer/worker;
+- generic notification-rule engine/DSL;
+- second settings service;
+- Context/History-fed Plan logic.
 
-No product implementation begins from this planning package.
+## Execution model
 
-The next work is to derive and freeze requirements, then proceed through:
+Phase A is a coherence/specification prerequisite. Functional implementation remains four macro-parts:
 
-`requirements -> acceptance criteria -> architecture -> traceability -> tasks -> implementation`
+1. Core Plan;
+2. Settings + runtime integration;
+3. UI + alerts;
+4. Regression + release hardening.
 
-Initial requirement families are expected to cover:
-
-- Plan evaluation;
-- checkpoint policy;
-- Settings persistence/migration;
-- Current Details presentation;
-- factual below-Plan transition notification.
-
-The exact REQ identifiers and decomposition remain to be decided during the next
-stage.
+`TASKS.md` decomposes these into smaller gated phases without changing that product-level structure.
+Every phase preserves the existing pytest/Ruff/mypy/compileall/`git diff --check` harness and reuses
+existing physical validation paths when UI/native behavior changes.

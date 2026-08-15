@@ -3,7 +3,6 @@ from __future__ import annotations
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
-from decimal import Decimal
 from enum import StrEnum
 from typing import Protocol
 
@@ -14,6 +13,7 @@ from codexbar.application.history import (
     HistorySchemaError,
 )
 from codexbar.domain.models import Fraction, UsageWindowId
+from codexbar.domain.quantities import FractionDelta
 
 
 class AnalysisPeriod(StrEnum):
@@ -68,17 +68,6 @@ class HistoricalSummary:
             raise ValueError("historical summary requires at least one observation")
         if self.latest_observed_at < self.first_observed_at:
             raise ValueError("latest observation must not precede first observation")
-
-
-@dataclass(frozen=True, slots=True)
-class FractionDelta:
-    """Signed difference between two normalized fractions."""
-
-    value: Decimal
-
-    def __post_init__(self) -> None:
-        if not self.value.is_finite():
-            raise ValueError("fraction delta must be a finite Decimal")
 
 
 @dataclass(frozen=True, slots=True)

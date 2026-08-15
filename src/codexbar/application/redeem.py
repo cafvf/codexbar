@@ -30,7 +30,7 @@ from codexbar.application.reset_ledger import (
     ResetLedgerWriteError,
 )
 from codexbar.application.reset_projection import RedeemAttemptState, fold_reset_events
-from codexbar.domain.errors import UsageCommandError, UsageSourceError, UsageTimeoutError
+from codexbar.domain.errors import UsageCommandError, UsageError, UsageTimeoutError
 from codexbar.domain.reset import ResetCreditId
 
 
@@ -53,7 +53,7 @@ class RedeemAttempt:
 class RedeemResult:
     attempt: RedeemAttempt
     observation: AccountRateLimitsObservation | None = None
-    refetch_error: UsageSourceError | None = None
+    refetch_error: UsageError | None = None
 
 
 class RedeemBeginError(RuntimeError):
@@ -220,7 +220,7 @@ class RedeemProcessManager:
     def _refetch_after_success(self, attempt: RedeemAttempt) -> RedeemResult:
         try:
             observation = self._reader.read_account_rate_limits()
-        except UsageSourceError as exc:
+        except UsageError as exc:
             return RedeemResult(attempt, refetch_error=exc)
         return RedeemResult(attempt, observation=observation)
 

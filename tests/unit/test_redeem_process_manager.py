@@ -16,7 +16,11 @@ from codexbar.application.redeem import (
 )
 from codexbar.application.reset_events import ResetEventId, ResetEventType, SequencedResetEvent
 from codexbar.application.reset_ledger import ResetLedgerWriteError
-from codexbar.domain.errors import UsageSourceUnavailableError, UsageTimeoutError
+from codexbar.domain.errors import (
+    UsageSchemaError,
+    UsageSourceUnavailableError,
+    UsageTimeoutError,
+)
 from codexbar.domain.models import Fraction, UsageSnapshot, UsageSource, UsageWindow, UsageWindowId
 from codexbar.domain.reset import ResetCreditReadResult
 
@@ -165,13 +169,20 @@ def test_timeout_after_possible_send_is_outcome_unknown() -> None:
     assert result.attempt.status is RedeemProcessStatus.OUTCOME_UNKNOWN
 
 
-def test_success_plus_refetch_failure_preserves_success() -> None:
+@pytest.mark.parametrize(
+    "refetch_error",
+    [
+        UsageSourceUnavailableError("offline"),
+        UsageSchemaError("unsupported response shape"),
+    ],
+)
+def test_success_plus_expected_refetch_failure_preserves_success(refetch_error) -> None:
     result = manager(
         Repo(),
         Consumer(),
-        Reader(error=UsageSourceUnavailableError("offline")),
+        Reader(error=refetch_error),
     ).redeem()
 
     assert result.attempt.status is RedeemProcessStatus.SUCCEEDED
     assert result.observation is None
-    assert result.refetch_error is not None
+    assert result.refetch_error is refetch_error

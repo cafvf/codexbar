@@ -1,9 +1,9 @@
 # CodexBar Product Specification
 
-Status: v1.7.0 release candidate
-Current validated baseline: 1.6.0
-Release candidate: 1.7.0
-Theme: Diagnose
+Status: v1.8 specification frozen for implementation
+Current validated release: v1.7.0 — Diagnose
+Active specification: v1.8 — Plan
+Theme: Plan
 
 ## Purpose
 
@@ -89,6 +89,22 @@ Read-only descriptive analytics, History UI, richer CURRENT details and stabiliz
 13. `pyproject.toml` is the single release-version authority and hosted CI covers Python 3.12, 3.13 and 3.14.
 14. Evidence-gated app-server, prune, WAL and Ayatana changes were evaluated and intentionally retained without speculative migration.
 
+## Active specification — v1.8 Plan
+
+v1.8 is frozen for implementation but is not yet a validated release.
+
+Its product question is:
+
+> How does Current compare with the plan I explicitly configured for this window?
+
+The frozen scope adds explicit per-window time-to-reset checkpoints, composes them with the existing
+usage reserve, shows a deterministic signed margin/compliance result in Current Details, and optionally
+notifies on a factual transition into below-plan state.
+
+Plan uses only Current plus explicit Settings and the observation timestamp. History, Historical Context,
+consumption-rate inference, forecasting, probability and automatic reset-credit redemption have no Plan
+authority.
+
 ## Non-functional invariants
 
 - domain/application behavior remains headless and deterministic except explicit composition boundaries;
@@ -102,7 +118,7 @@ Read-only descriptive analytics, History UI, richer CURRENT details and stabiliz
 - native system-Python helper remains isolated and Qt fallback remains part of the product contract;
 - persistence-format evolution requires an explicit compatibility decision.
 
-## Explicitly deferred beyond v1.7
+## Explicitly deferred from v1.8 Plan
 
 - forecasting or time-to-exhaustion;
 - authoritative token-consumption estimation;

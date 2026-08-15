@@ -1,264 +1,358 @@
-# CodexBar v1.8 — Product Decisions
+# CodexBar v1.8 — Decisions and complexity ledger
 
-Status: frozen for requirements drafting  
-Theme: Plan
+Status: frozen for implementation
 
-These decisions define v1.8 product semantics. Changing them requires an explicit
-specification amendment before implementation.
+## DEC-1801 — Plan composes existing reserve; it does not own a second reserve
 
-## DEC-1801 — Current and explicit settings are the only Plan authorities
+`UsageReservePolicy` remains the sole configured reserve authority.
 
-Decision: ACCEPTED
+Plan combines:
 
-Plan evaluation uses authoritative Current facts plus explicit user configuration.
+```text
+existing UsageReservePolicy
++
+new UsagePlanCheckpointPolicy
+```
 
-History, Historical Context, reset ledger, prior-cycle behavior and inferred usage
-rate are not Plan inputs.
+Rejected:
 
-## DEC-1802 — Existing reserve remains the single reserve authority
+- `PlanPolicy.reserve_floor`;
+- duplicated reserve fields;
+- moving existing reserve into a new nested Plan document.
 
-Decision: ACCEPTED
+Reason: duplicate configuration would create two sources of truth and break the v1.5 Budget contract.
 
-The existing per-`UsageWindowId` `UsageReservePolicy` remains canonical.
+## DEC-1802 — Time coordinate belongs to the observation
 
-v1.8 must not create an independently configurable second `reserve_floor`.
+Plan uses:
 
-Budget keeps its existing reserve/headroom contract.
+```text
+TimeToReset.from_instants(
+    observed_at=snapshot.observed_at,
+    resets_at=window.resets_at,
+)
+```
 
-## DEC-1803 — Plan checkpoints are keyed only by UsageWindowId
+It MUST NOT use render-time/current wall clock to move an old remaining value through checkpoints.
 
-Decision: ACCEPTED
+Reason: mixing stale remaining with a newer clock constructs a state that was never observed.
 
-Checkpoint policy is associated with dynamic `UsageWindowId`.
+## DEC-1803 — Stepwise checkpoints, inclusive boundary, no interpolation
 
-Policy must not be inherited by:
+For current factual coordinate `t`, eligible checkpoints satisfy:
 
-- human label;
-- display order;
-- guessed window duration;
-- fixed "5h" / "weekly" aliases.
+```text
+t <= checkpoint.time_to_reset
+```
 
-Unknown/new window IDs do not inherit another window's Plan policy.
+The active checkpoint is the eligible checkpoint having the smallest `time_to_reset`.
 
-## DEC-1804 — Checkpoints use time-to-reset coordinates
+Exact equality activates the checkpoint.
 
-Decision: ACCEPTED
+Rejected:
 
-A checkpoint is defined by:
+- interpolation between checkpoints;
+- “next future target” scoring;
+- consumption-rate extrapolation.
 
-- a time-to-reset duration; and
-- a minimum remaining fraction.
+## DEC-1804 — Non-monotonic explicit floors are valid
 
-Checkpoint policy does not use absolute timestamps or time-since-cycle-start as its
-canonical coordinate.
+The following is valid:
 
-## DEC-1805 — Checkpoint evaluation is a step function
+```text
+72h -> 40%
+24h -> 60%
+```
 
-Decision: ACCEPTED
+CodexBar evaluates explicit intent; it does not infer feasibility.
 
-A checkpoint at threshold `t_i` is reached when current factual time-to-reset `t`
-satisfies:
+Duplicate checkpoint times for the same `UsageWindowId` are invalid because they are ambiguous.
 
-`t <= t_i`
+No warning system for non-monotonic policy is required in v1.8.
 
-The active checkpoint is the reached checkpoint with the smallest `t_i`.
+## DEC-1805 — Orthogonal result dimensions
 
-The active floor remains in force until a later checkpoint is reached.
+Do not create one overloaded `PlanStatus`.
 
-No interpolation is performed.
+Use:
 
-## DEC-1806 — Effective floor is the maximum applicable explicit floor
+- `PlanCheckpointResolution`;
+- `PlanCompliance`;
+- optional `effective_floor`;
+- optional signed `margin`.
 
-Decision: ACCEPTED
+Checkpoint resolutions:
 
-When both reserve and active checkpoint floor exist:
+- `NOT_CONFIGURED`;
+- `RESET_MISSING`;
+- `RESET_INVALID`;
+- `NO_ACTIVE_CHECKPOINT`;
+- `ACTIVE`.
 
-`effective_floor = max(reserve, active_checkpoint_floor)`
+Compliance values:
 
-When only one exists, that component is the effective floor.
+- `ABOVE`;
+- `AT`;
+- `BELOW`.
 
-Checkpoint policy may not silently weaken the existing reserve.
+Freshness remains owned by Current and is not duplicated into Plan assessment.
 
-## DEC-1807 — Plan margin is signed
+## DEC-1806 — Shared neutral quantities get one owner with compatibility imports
 
-Decision: ACCEPTED
+`TimeToReset` and `FractionDelta` are neutral quantities used by more than one feature.
 
-For remaining `R` and effective floor `F`:
+Introduce one neutral domain owner such as:
 
-`margin = R - F`
+```text
+codexbar.domain.quantities
+```
 
-Plan must preserve negative margin below policy rather than clipping it to zero.
+Existing historical imports remain valid by importing/re-exporting the same class from:
 
-Existing Budget headroom semantics remain unchanged.
+```text
+codexbar.domain.context.TimeToReset
+codexbar.application.analytics.FractionDelta
+```
 
-## DEC-1808 — Core Plan outcomes distinguish above, equality and below
+`Fraction` remains where it is; moving it would create broad churn with no v1.8 benefit.
 
-Decision: ACCEPTED
+Complexity accepted: one small domain module.
 
-When an effective floor exists, core semantic outcomes are:
+Complexity avoided: import-path migration across existing tests/modules.
 
-- above Plan when `R > F`;
-- at Plan when `R == F`;
-- below Plan when `R < F`.
+## DEC-1807 — Settings schema v3 stays flat and explicit
 
-`NO_PLAN` means no reserve and no checkpoint policy are configured for that
-`UsageWindowId`.
+Schema v3 adds exactly:
 
-A configured checkpoint policy whose first checkpoint has not yet become active is
-not `NO_PLAN`. A configured policy whose checkpoint assessment is unavailable is
-also not `NO_PLAN`.
+```text
+usage_plan_checkpoints
+plan_breach_notifications_enabled
+```
 
-Equality is compliant.
+Existing `usage_reserves` remains unchanged.
 
-Final Python enum names and final UI wording for pending/unavailable states may be
-chosen during requirements and architecture work without changing this semantic
-partition.
+Canonical JSON:
 
-## DEC-1809 — Missing reset time causes partial capability degradation
+```json
+{
+  "schema_version": 3,
+  "low_remaining_threshold": "0.20",
+  "refresh_interval_seconds": 60,
+  "notifications_enabled": true,
+  "usage_reserves": {
+    "window_10080m": "0.15"
+  },
+  "usage_plan_checkpoints": {
+    "window_10080m": [
+      {
+        "time_to_reset_seconds": 259200,
+        "minimum_remaining": "0.55"
+      },
+      {
+        "time_to_reset_seconds": 86400,
+        "minimum_remaining": "0.30"
+      }
+    ]
+  },
+  "plan_breach_notifications_enabled": false
+}
+```
 
-Decision: ACCEPTED
+Why integer seconds:
 
-When factual `resets_at` is unavailable:
+- Plan checkpoint configuration is constrained to whole-second `TimeToReset` values, so persistence is exact;
+- explicit unit;
+- no duration-string parser/DSL;
+- independent of upstream `windowDurationMins`;
+- UI can display friendly hours/days without changing persistence semantics.
 
-- checkpoint selection is unavailable;
-- reserve assessment remains valid if reserve exists;
-- CodexBar does not infer reset timing from identifiers, labels, History or prior
-  cycles.
+`TimeToReset` remains a general neutral quantity and may represent finer `timedelta` precision for other
+features. The whole-second restriction belongs to persisted Plan checkpoint policy, not to the shared
+quantity itself.
 
-"Policy exists but checkpoint cannot currently be evaluated" must remain distinct
-from "no policy configured".
+Canonical order:
 
-## DEC-1810 — Duplicate checkpoint times are invalid; non-monotonic floors are valid
+- window IDs lexicographically;
+- checkpoints for one window in descending `time_to_reset_seconds`.
 
-Decision: ACCEPTED
+## DEC-1808 — Schema compatibility follows existing explicit-save behavior
 
-Within one window policy, checkpoint time-to-reset values must be unique.
+Schemas 1 and 2 remain readable.
 
-Entry order has no semantic meaning and may be normalized.
+Reading legacy settings does not rewrite the file.
 
-Checkpoint minimum floors are not required to be monotonic as reset approaches.
-Plan evaluates explicit policy compliance, not policy feasibility.
+The next explicit Save writes canonical schema 3.
 
-## DEC-1811 — Canonical checkpoint duration is integer seconds
+Malformed/unsupported documents continue to fall back according to the existing settings error policy.
 
-Decision: ACCEPTED
+Downgrade from a saved schema 3 file to an older CodexBar that does not support schema 3 is not promised.
 
-Time-to-reset thresholds use non-negative integer seconds as the canonical
-domain/persistence unit.
+A dedicated ADR records this evolution because ADR-005 requires an explicit compatibility decision for new schema versions.
 
-UI may render human-friendly hours/days.
+## DEC-1809 — Fixed Plan breach opt-in instead of notification rule engine
 
-Floating-point duration is not the canonical policy representation.
+Add:
 
-## DEC-1812 — Settings evolution is additive and backward-compatible
+```text
+plan_breach_notifications_enabled: bool
+```
 
-Decision: ACCEPTED
+Default:
 
-Checkpoint policy belongs to canonical application settings.
+```text
+false
+```
 
-Existing schema-v2 `usage_reserves` meaning must not change.
+Global `notifications_enabled` remains the master delivery switch.
 
-A new persistent checkpoint field requires a settings schema-version increment.
+Rejected:
 
-Valid prior settings load without checkpoint policy and are not automatically
-rewritten merely by being read.
+- `notification_rules[]`;
+- expression DSL;
+- per-rule cron/frequency;
+- independent scheduler;
+- generic policy engine.
 
-Exact new JSON field shape is deferred to the settings requirement.
+Reason: v1.8 has exactly one factual notification need.
 
-## DEC-1813 — Stale observations are presentation evidence, not transition authority
+## DEC-1810 — Plan alert semantics reuse the current alert harness properties
 
-Decision: ACCEPTED
+The Plan tracker is in-memory and CURRENT-only.
 
-A stale snapshot may be displayed with explicit freshness and a deterministic
-comparison derived from its last-known values.
+Rules:
 
-Stale data must not generate a new Plan transition notification or side effect.
+- first eligible observation is a silent baseline;
+- transition into `BELOW` emits one event;
+- remaining `BELOW` deduplicates;
+- recovery to `ABOVE`/`AT` rearms;
+- later transition to `BELOW` may emit again;
+- delivery-disabled transitions still update tracker state;
+- STALE does not emit or advance the tracker;
+- a relevant Plan policy edit establishes a new silent baseline;
+- a new factual reset cycle establishes a new silent baseline when checkpoints are configured;
+- checkpoint-only `NO_ACTIVE_CHECKPOINT -> BELOW` inside the same resolved cycle may emit because the checkpoint just became applicable;
+- configured checkpoints with missing/invalid reset make Plan breach alert evaluation ineligible until reset capability is factual again.
 
-## DEC-1814 — v1.8 Plan notification is only transition into below-Plan
+No persistence is required.
 
-Decision: ACCEPTED
+## DEC-1811 — Separate PlanAlertService; shared NotificationPort and snapshot path
 
-The only new Plan alert behavior in the core candidate scope is factual transition
-from a non-below state into below-Plan.
+Do not overload the existing LOW/EXHAUSTED `AlertService` with Plan-specific cycle/policy semantics.
 
-Repeated below-Plan observations are silent.
+Introduce one small `PlanAlertService`, but:
 
-Leaving below-Plan rearms the tracker.
+- it uses the existing `NotificationPort`;
+- it is called by the existing tray snapshot/adoption path;
+- it gets no executor, repository, cache or timer;
+- it cannot invoke redeem.
 
-No generic notification rules engine is introduced.
+This small separation pays for semantic isolation while preserving the existing usage-alert harness.
 
-## DEC-1815 — Historical Context cannot influence Plan
+## DEC-1812 — Plan evaluation is pure and synchronous
 
-Decision: ACCEPTED
+Plan evaluation is O(number of checkpoints for a window), tiny relative to source/history I/O.
 
-Historical Context remains descriptive.
+No worker/executor/cache/revision is introduced.
 
-Its cycle selection, empirical bands, coverage, quantiles and any future Explore
-surface cannot change:
+Rejected as unjustified:
 
-- Plan floor;
-- Plan margin;
-- Plan status;
-- Plan notification transitions.
+- `PlanRuntime`;
+- `PlanRepository`;
+- `PlanRevision`;
+- background Plan worker;
+- memoization.
 
-## DEC-1816 — Plan does not predict future compliance
+## DEC-1813 — Current Details adds one sibling panel
 
-Decision: ACCEPTED
+Add a `PlanPanel` next to the existing Control/Budget surface.
 
-Plan evaluates the floor that is applicable **now**.
+Do not merge the application Budget model into Plan.
 
-CodexBar must not label Current as "on Plan" merely because it is above a future
-checkpoint floor when that checkpoint has not yet become active.
+To reduce visual duplication, Plan renders the source of the effective floor rather than reproducing the full Budget headroom block.
 
-No consumption forecast, predicted checkpoint state or time-to-exhaustion estimate
-is introduced.
+Recommended placement in the current panel order:
 
-## DEC-1817 — Reset credits do not enter Plan-status calculation
+```text
+Reset credits
+Control / budget
+Plan
+Reset action
+```
 
-Decision: ACCEPTED
+Exact Qt layout remains an implementation choice.
 
-Reset-credit inventory, expiry and ledger events do not alter Plan status.
+## DEC-1814 — GUI checkpoint editing uses typed controls, not a mini-language
 
-Redeem remains explicit, manual, durable and idempotent.
+The Settings UI must allow add/edit/remove checkpoint rows for current dynamic windows.
 
-Automatic redeem remains prohibited.
+Rejected despite lower initial code volume:
 
-Reset-credit expiry/count-change notifications are not core Plan semantics.
+```text
+"72h=0.55,24h=0.30"
+```
 
-## DEC-1818 — Plan remains explainable
+or similar free-text DSL.
 
-Decision: ACCEPTED
+Reason: a mini-language creates parsing, escaping, error-reporting and user-ambiguity costs that exceed the widget complexity.
 
-A user-visible Plan assessment must be able to explain the inputs that determined
-the result, including as applicable:
+The exact Qt control layout is non-normative.
 
-- Current remaining;
-- reserve;
-- active checkpoint;
-- checkpoint floor;
-- effective floor;
-- signed margin;
-- freshness/capability limitations.
+Existing policies for currently absent windows must be preserved.
 
-History must not be required to explain a Plan result.
+## DEC-1815 — UsageWindowId remains opaque outside adapter/presentation
 
-## DEC-1819 — Budget and Control remain independent from Plan
+Plan, Settings and Budget compare/store IDs; they never parse `window_300m`.
 
-Decision: ACCEPTED
+The existing compact-label presentation helper may continue to interpret known adapter IDs for UI labeling.
 
-Plan may consume the canonical reserve semantic, but Budget and Control do not
-depend on Plan.
+No v1.8 ID-format migration is introduced.
 
-Plan must not mutate reserve, alter Control opportunity decisions or trigger
-redeem.
+## DEC-1816 — History, Context and reset evidence have zero Plan authority
 
-## DEC-1820 — No Plan-specific historical persistence is authorized
+Plan evaluation inputs are only:
 
-Decision: ACCEPTED
+- current usage observation;
+- explicit reserve policy;
+- explicit checkpoint policy.
 
-v1.8 does not introduce a Plan Event Store, Plan history database or new historical
-analytics store.
+No History, Context, reset ledger, empirical band, prior cycle, activity/session or reset-credit count enters compliance.
 
-Settings persistence is sufficient for explicit policy.
+## DEC-1817 — STALE display is conservative
 
-Any future persistence of Plan evaluations requires a separate product decision.
+The pure evaluator may describe the factual coordinates of an observation, but Current Details MUST NOT label a STALE observation as current Plan compliance.
+
+PlanPanel shows a stale/unavailable message instead.
+
+Alerts ignore STALE.
+
+## DEC-1818 — Existing behavior fixes are separated from Plan evolution
+
+Existing contract repairs are tracked in `COHERENCE-BASELINE.md` and remain traceable to their historical REQs/ACs.
+
+They do not become new Plan requirements merely because v1.8 exposed them.
+
+## Complexity accepted
+
+1. One neutral quantities module.
+2. One pure Plan application module.
+3. One small in-memory Plan alert service/tracker.
+4. Settings schema v3 inside the existing repository.
+5. One typed checkpoint editor extension to existing Settings.
+6. One PlanPanel in existing Current Details.
+7. One ADR for schema compatibility.
+
+## Complexity explicitly rejected/deferred
+
+- second settings repository;
+- Plan SQLite;
+- Plan Event Store;
+- Plan cache/revision;
+- Plan background executor;
+- Plan scheduler;
+- generic notification rules;
+- predictive model;
+- Context/History dependency;
+- automatic redeem;
+- global Settings runtime/DI rewrite;
+- global taxonomy renaming campaign;
+- removal of legacy controllers without a separate reference/migration audit.

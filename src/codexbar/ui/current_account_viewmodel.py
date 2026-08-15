@@ -8,6 +8,7 @@ from enum import StrEnum
 from codexbar.application.account import AccountRateLimitsObservation
 from codexbar.application.account_presentation import LatestAccountObservationReader
 from codexbar.application.budget import BudgetRuntime, WindowBudget
+from codexbar.application.plan import WindowPlanAssessment, evaluate_window_plan
 from codexbar.application.redeem import RedeemAttempt, RedeemProcessManager
 from codexbar.application.redeem_execution import RedeemExecutionController
 from codexbar.application.reset_ledger import ResetLedgerError
@@ -67,11 +68,20 @@ class RedeemActionViewState:
 
 
 @dataclass(frozen=True, slots=True)
+class PlanViewState:
+    """CURRENT-only Plan assessments composed from the captured observation."""
+
+    available: bool = False
+    windows: tuple[WindowPlanAssessment, ...] = ()
+
+
+@dataclass(frozen=True, slots=True)
 class CurrentAccountViewState:
     usage: UsageViewState
     reset: ResetCurrentViewState
     budget: BudgetViewState
     redeem: RedeemActionViewState
+    plan: PlanViewState = PlanViewState()
 
 
 ProjectionProvider = Callable[[], ResetLedgerProjection]
@@ -96,6 +106,7 @@ class CurrentAccountPresenter:
         clock: Clock | None = None,
     ) -> None:
         self._latest_reader = latest_reader
+        self._settings = settings
         self._budget_runtime = BudgetRuntime(settings)
         self._projection_provider = projection_provider
         self._redeem_manager = redeem_manager
@@ -120,6 +131,7 @@ class CurrentAccountPresenter:
         self.runtime_diagnostics = diagnostics
 
     def apply_settings(self, settings: AppSettings) -> None:
+        self._settings = settings
         self._budget_runtime.apply_settings(settings)
 
     def current(self) -> CurrentAccountViewState | None:
@@ -136,12 +148,33 @@ class CurrentAccountPresenter:
             and observation.usage.freshness is Freshness.CURRENT
         )
         return CurrentAccountViewState(
-            usage=UsageViewModel.from_snapshot(observation.usage),
+            usage=UsageViewModel.from_snapshot(
+                observation.usage,
+                self._settings.usage_policy(),
+            ),
             reset=_reset_view(observation),
             budget=budget,
             redeem=RedeemActionViewState(
                 available=redeem_available,
                 unresolved=unresolved,
+            ),
+            plan=self._plan_view(observation),
+        )
+
+    def _plan_view(self, observation: AccountRateLimitsObservation) -> PlanViewState:
+        usage = observation.usage
+        if usage.freshness is not Freshness.CURRENT:
+            return PlanViewState()
+        return PlanViewState(
+            available=True,
+            windows=tuple(
+                evaluate_window_plan(
+                    window=window,
+                    observed_at=usage.observed_at,
+                    reserve_policy=self._settings.usage_reserves,
+                    checkpoint_policy=self._settings.usage_plan_checkpoints,
+                )
+                for window in usage.windows
             ),
         )
 

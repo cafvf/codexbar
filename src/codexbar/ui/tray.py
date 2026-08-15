@@ -21,6 +21,7 @@ from PySide6.QtWidgets import (
 )
 
 from codexbar.application.alerts import AlertService
+from codexbar.application.plan_alerts import PlanAlertService
 from codexbar.application.ports import NotificationPort, UsageProvider
 from codexbar.application.refresh import RefreshCoordinator
 from codexbar.application.settings import SettingsRepository
@@ -178,6 +179,7 @@ class TrayShell:
             usage_policy=settings.usage_policy(),
             alert_service=AlertService(notifier),
             notifications_enabled=settings.notifications_enabled,
+            plan_alert_service=PlanAlertService(notifier, settings),
         )
         self._settings_actions = SettingsActions(repository, self.apply_settings)
         self._settings_dialog: SettingsDialog | None = None
@@ -239,6 +241,7 @@ class TrayShell:
         self._settings = settings
         self._controller.apply_usage_policy(settings.usage_policy())
         self._controller.apply_notifications_enabled(settings.notifications_enabled)
+        self._controller.apply_plan_settings(settings)
         apply_refresh_interval(self._refresh_timer, settings)
 
     def show_settings(self) -> None:

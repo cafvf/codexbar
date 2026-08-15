@@ -144,6 +144,9 @@ class ControlTrayShell(HistoricalTrayShell):
     def apply_settings(self, settings: AppSettings) -> None:
         super().apply_settings(settings)
         self._presenter.apply_settings(settings)
+        # Reproject the already-captured account observation immediately. This is
+        # presentation-only: Plan alerts advance only on the next snapshot path.
+        self._control_panel.render_state(self._controller.state)
 
     def _on_redeem_changed(self, result: RedeemResult) -> None:
         observation = result.observation

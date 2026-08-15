@@ -6,6 +6,7 @@ from enum import StrEnum
 from typing import Final, Protocol
 
 from codexbar.application.alerts import AlertService
+from codexbar.application.plan_alerts import PlanAlertService
 from codexbar.domain.errors import CodexBarError
 from codexbar.domain.models import DEFAULT_USAGE_POLICY, UsagePolicy, UsageSnapshot
 from codexbar.domain.settings import AppSettings
@@ -65,6 +66,7 @@ class TrayController:
         usage_policy: UsagePolicy = DEFAULT_USAGE_POLICY,
         alert_service: AlertService | None = None,
         notifications_enabled: bool = True,
+        plan_alert_service: PlanAlertService | None = None,
     ) -> None:
         self._coordinator = coordinator
         self._executor = executor or ThreadPoolExecutor(
@@ -74,6 +76,7 @@ class TrayController:
         self._usage_policy = usage_policy
         self._alert_service = alert_service
         self._notifications_enabled = notifications_enabled
+        self._plan_alert_service = plan_alert_service
         self._future: Future[UsageSnapshot] | None = None
         self._future_generation: int | None = None
         self._generation = 0
@@ -93,6 +96,11 @@ class TrayController:
 
     def apply_notifications_enabled(self, enabled: bool) -> None:
         self._notifications_enabled = enabled
+
+    def apply_plan_settings(self, settings: AppSettings) -> None:
+        service = self._plan_alert_service
+        if service is not None:
+            service.apply_settings(settings)
 
     def start_refresh(self) -> bool:
         if self.busy:
@@ -143,6 +151,11 @@ class TrayController:
             self._alert_service.process(
                 snapshot,
                 self._usage_policy,
+                notifications_enabled=self._notifications_enabled,
+            )
+        if self._plan_alert_service is not None:
+            self._plan_alert_service.process(
+                snapshot,
                 notifications_enabled=self._notifications_enabled,
             )
         usage = UsageViewModel.from_snapshot(snapshot, self._usage_policy)

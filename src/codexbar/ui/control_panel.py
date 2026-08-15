@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable
+from datetime import timedelta
 from decimal import Decimal
 
 from PySide6.QtCore import QTimer
@@ -13,6 +14,11 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from codexbar.application.plan import (
+    PlanCheckpointResolution,
+    PlanCompliance,
+    WindowPlanAssessment,
+)
 from codexbar.application.redeem import RedeemProcessManager, RedeemResult
 from codexbar.application.redeem_execution import (
     RedeemExecutionController,
@@ -122,6 +128,128 @@ class BudgetPanel(QFrame):
             )
         )
         self._body.setText("\n".join(lines))
+
+
+class PlanPanel(QFrame):
+    """Read-only factual Plan presentation; evaluation remains in the presenter."""
+
+    def __init__(self, parent: QWidget | None = None) -> None:
+        super().__init__(parent)
+        self.setFrameShape(QFrame.Shape.StyledPanel)
+        layout = QVBoxLayout(self)
+        layout.addWidget(QLabel("Plan"))
+        self._body = QLabel("No Plan state yet.")
+        self._body.setWordWrap(True)
+        layout.addWidget(self._body)
+
+    def render_account_state(self, state: CurrentAccountViewState | None) -> None:
+        self._body.setText(_plan_body_text(state))
+
+
+def _plan_body_text(state: CurrentAccountViewState | None) -> str:
+    if state is None:
+        return "No Plan state yet."
+    if state.usage.stale or not state.plan.available:
+        return "Plan unavailable while current usage is stale."
+    if not state.plan.windows:
+        return "No current usage windows reported for Plan evaluation."
+
+    labels = {window.window_id: window.label for window in state.usage.windows}
+    lines: list[str] = []
+    for assessment in state.plan.windows:
+        label = labels.get(assessment.window_id, assessment.window_id.value)
+        lines.extend(_plan_window_lines(label, assessment))
+        lines.append("")
+    return "\n".join(lines).rstrip()
+
+
+def _plan_window_lines(
+    label: str,
+    assessment: WindowPlanAssessment,
+) -> tuple[str, ...]:
+    lines = [label, f"  Current: {_percent(assessment.remaining.value)}%"]
+    resolution = assessment.checkpoint_resolution
+
+    if resolution is PlanCheckpointResolution.NOT_CONFIGURED:
+        if assessment.reserve is None:
+            lines.append("  Plan policy: Not configured")
+        else:
+            lines.append("  Checkpoint: Not configured")
+    elif resolution is PlanCheckpointResolution.NO_ACTIVE_CHECKPOINT:
+        lines.append("  Checkpoint: No active checkpoint at current time-to-reset")
+    elif resolution is PlanCheckpointResolution.RESET_MISSING:
+        lines.append("  Checkpoint: Reset unavailable")
+    elif resolution is PlanCheckpointResolution.RESET_INVALID:
+        lines.append("  Checkpoint: Reset invalid or already passed")
+    elif assessment.active_checkpoint is not None:
+        checkpoint = assessment.active_checkpoint
+        lines.append(
+            "  Active checkpoint: "
+            f"{_duration_text(checkpoint.time_to_reset.duration)} -> "
+            f"minimum {_percent(checkpoint.minimum_remaining.value)}%"
+        )
+
+    if assessment.effective_floor is None:
+        lines.extend(("  Effective floor: Not configured", "  Margin: Not applicable"))
+    else:
+        source = _effective_floor_source(assessment)
+        lines.append(
+            f"  Effective floor: {_percent(assessment.effective_floor.value)}% "
+            f"({source})"
+        )
+        margin = (
+            "Not applicable"
+            if assessment.margin is None
+            else f"{_signed_percentage_points(assessment.margin.value)} pp"
+        )
+        lines.append(f"  Margin: {margin}")
+
+    lines.append(f"  Status: {_plan_status_text(assessment.compliance)}")
+    return tuple(lines)
+
+
+def _effective_floor_source(assessment: WindowPlanAssessment) -> str:
+    reserve = assessment.reserve
+    checkpoint = assessment.active_checkpoint
+    if reserve is None:
+        return "checkpoint"
+    if checkpoint is None:
+        return "reserve"
+    checkpoint_floor = checkpoint.minimum_remaining
+    if reserve.value == checkpoint_floor.value:
+        return "reserve + checkpoint"
+    if reserve.value > checkpoint_floor.value:
+        return "reserve"
+    return "checkpoint"
+
+
+def _plan_status_text(compliance: PlanCompliance | None) -> str:
+    return {
+        PlanCompliance.ABOVE: "On plan",
+        PlanCompliance.AT: "At plan floor",
+        PlanCompliance.BELOW: "Below plan",
+        None: "Not applicable",
+    }[compliance]
+
+
+def _signed_percentage_points(value: Decimal) -> str:
+    points = value * Decimal("100")
+    if points == 0:
+        return "0"
+    return format(points.normalize(), "+f")
+
+
+def _duration_text(value: timedelta) -> str:
+    seconds = int(value.total_seconds())
+    if seconds < 7 * 86_400 and seconds % 3_600 == 0:
+        return f"{seconds // 3_600}h"
+    if seconds % 86_400 == 0:
+        return f"{seconds // 86_400}d"
+    if seconds % 3_600 == 0:
+        return f"{seconds // 3_600}h"
+    if seconds % 60 == 0:
+        return f"{seconds // 60}m"
+    return f"{seconds}s"
 
 
 class RedeemPanel(QFrame):
@@ -290,6 +418,7 @@ class CurrentAccountPanel(RichUsagePanel):
         self._presenter = presenter
         self.reset_panel = ResetCreditsPanel(self)
         self.budget_panel = BudgetPanel(self)
+        self.plan_panel = PlanPanel(self)
         self.redeem_panel = RedeemPanel(
             redeem_manager,
             controller=redeem_controller,
@@ -299,13 +428,15 @@ class CurrentAccountPanel(RichUsagePanel):
         insert_at = max(0, self._layout.count() - 1)
         self._layout.insertWidget(insert_at, self.reset_panel)
         self._layout.insertWidget(insert_at + 1, self.budget_panel)
-        self._layout.insertWidget(insert_at + 2, self.redeem_panel)
+        self._layout.insertWidget(insert_at + 2, self.plan_panel)
+        self._layout.insertWidget(insert_at + 3, self.redeem_panel)
 
     def render_state(self, state: TrayViewState) -> None:
         super().render_state(state)
         account = self._presenter.current()
         self.reset_panel.render_account_state(account)
         self.budget_panel.render_account_state(account)
+        self.plan_panel.render_account_state(account)
         self.redeem_panel.render_account_state(account)
 
     def current_usage_windows(self) -> tuple[tuple[UsageWindowId, str], ...]:

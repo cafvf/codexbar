@@ -7,7 +7,9 @@ from collections.abc import Callable
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 
-from codexbar.application.alerts import AlertEvent, AlertService
+from codexbar.application.alerts import AlertService
+from codexbar.application.notifications import NotificationMessage
+from codexbar.application.plan_alerts import PlanAlertService
 from codexbar.application.ports import NotificationPort
 from codexbar.domain.errors import NotificationDeliveryError
 from codexbar.domain.models import (
@@ -18,16 +20,23 @@ from codexbar.domain.models import (
     UsageWindow,
     UsageWindowId,
 )
+from codexbar.domain.quantities import TimeToReset
+from codexbar.domain.settings import (
+    AppSettings,
+    UsagePlanCheckpoint,
+    UsagePlanCheckpointPolicy,
+)
 from codexbar.infrastructure.notifications import NotifySendNotificationAdapter
 
 DEFAULT_POLICY = UsagePolicy(low_remaining_threshold=Fraction(Decimal("0.20")))
 STEP_DELAY_SECONDS = 2.5
+WEEKLY_ID = UsageWindowId("weekly")
 
 
 class FailingNotifier:
-    def notify(self, event: AlertEvent) -> None:
+    def notify(self, message: NotificationMessage) -> None:
         raise NotificationDeliveryError(
-            f"simulated notification failure for {event.window_id.value}"
+            f"simulated notification failure for {message.summary}"
         )
 
 
@@ -55,7 +64,7 @@ def run_sequence(
     *,
     delay_seconds: float = STEP_DELAY_SECONDS,
 ) -> None:
-    print(f"\\n=== {title} ===")
+    print(f"\n=== {title} ===")
     service = AlertService(notifier)
     for index, (description, snapshot, enabled) in enumerate(steps, start=1):
         print(f"[{index}/{len(steps)}] {description}")
@@ -159,7 +168,7 @@ def scenario_disabled(notifier: NotificationPort, delay: float) -> None:
 
 
 def scenario_restart(notifier: NotificationPort, delay: float) -> None:
-    print("\\n=== Restart / new tracker baseline ===")
+    print("\n=== Restart / new tracker baseline ===")
     first = AlertService(notifier)
     first.process(make_snapshot(("weekly", "Weekly", "0.80")), DEFAULT_POLICY,
                   notifications_enabled=True)
@@ -190,7 +199,7 @@ def scenario_multi(notifier: NotificationPort, delay: float) -> None:
 
 
 def scenario_failure(delay: float) -> None:
-    print("\\n=== Notification failure isolation ===")
+    print("\n=== Notification failure isolation ===")
     service = AlertService(FailingNotifier())
     service.process(make_snapshot(("weekly", "Weekly", "0.80")), DEFAULT_POLICY,
                     notifications_enabled=True)
@@ -199,6 +208,139 @@ def scenario_failure(delay: float) -> None:
                              notifications_enabled=True)
     print(f"  process survived; transition event count: {len(events)}")
     print("  PASS condition: script reaches this line without exception.")
+
+
+def _plan_settings(
+    *,
+    reserve: str | None = "0.50",
+    checkpoint_hours: int | None = None,
+    checkpoint_minimum: str = "0.60",
+    enabled: bool = True,
+) -> AppSettings:
+    settings = AppSettings.defaults()
+    if reserve is not None:
+        settings = settings.with_usage_reserve(WEEKLY_ID, Fraction(Decimal(reserve)))
+    if checkpoint_hours is not None:
+        settings = settings.with_usage_plan_checkpoints(
+            UsagePlanCheckpointPolicy(
+                (
+                    UsagePlanCheckpoint(
+                        WEEKLY_ID,
+                        TimeToReset(timedelta(hours=checkpoint_hours)),
+                        Fraction(Decimal(checkpoint_minimum)),
+                    ),
+                )
+            )
+        )
+    return settings.with_plan_breach_notifications_enabled(enabled)
+
+
+def _plan_snapshot(
+    remaining: str,
+    *,
+    observed_at: datetime,
+    resets_at: datetime | None,
+) -> UsageSnapshot:
+    return UsageSnapshot(
+        windows=(
+            UsageWindow(
+                WEEKLY_ID,
+                "Weekly",
+                Fraction(Decimal(remaining)),
+                resets_at=resets_at,
+            ),
+        ),
+        observed_at=observed_at,
+        source=UsageSource.MOCK,
+    )
+
+
+def scenario_plan_breach(notifier: NotificationPort, delay: float) -> None:
+    print("\n=== Plan ABOVE -> BELOW ===")
+    service = PlanAlertService(notifier, _plan_settings())
+    now = datetime.now(UTC)
+    for description, remaining in [
+        ("Establish ABOVE Plan baseline at 80%; expect NO notification.", "0.80"),
+        ("Cross below 50% Plan floor; expect ONE Plan breach notification.", "0.40"),
+        ("Remain below Plan floor; expect NO repeated notification.", "0.35"),
+    ]:
+        print(description)
+        events = service.process(
+            _plan_snapshot(remaining, observed_at=now, resets_at=None),
+            notifications_enabled=True,
+        )
+        print(f"  Plan transition event(s): {len(events)}")
+        time.sleep(delay)
+
+
+def scenario_plan_rearm(notifier: NotificationPort, delay: float) -> None:
+    print("\n=== Plan recovery and re-arm ===")
+    service = PlanAlertService(notifier, _plan_settings())
+    now = datetime.now(UTC)
+    for remaining in ("0.80", "0.40", "0.70", "0.40"):
+        events = service.process(
+            _plan_snapshot(remaining, observed_at=now, resets_at=None),
+            notifications_enabled=True,
+        )
+        print(f"  remaining={remaining}; event(s)={len(events)}")
+        time.sleep(delay)
+    print("  PASS condition: two Plan notifications appear, separated by recovery.")
+
+
+def scenario_plan_disabled(notifier: NotificationPort, delay: float) -> None:
+    print("\n=== Plan opt-in disabled / re-enabled without replay ===")
+    now = datetime.now(UTC)
+    service = PlanAlertService(notifier, _plan_settings(enabled=False))
+    service.process(
+        _plan_snapshot("0.80", observed_at=now, resets_at=None),
+        notifications_enabled=True,
+    )
+    events = service.process(
+        _plan_snapshot("0.40", observed_at=now, resets_at=None),
+        notifications_enabled=True,
+    )
+    print(f"  breach while Plan notifications disabled; event(s)={len(events)}, delivery=none")
+    time.sleep(delay)
+    service.apply_settings(_plan_settings(enabled=True))
+    events = service.process(
+        _plan_snapshot("0.40", observed_at=now, resets_at=None),
+        notifications_enabled=True,
+    )
+    print(f"  re-enabled while still below; replay event(s)={len(events)}")
+    service.process(
+        _plan_snapshot("0.70", observed_at=now, resets_at=None),
+        notifications_enabled=True,
+    )
+    events = service.process(
+        _plan_snapshot("0.40", observed_at=now, resets_at=None),
+        notifications_enabled=True,
+    )
+    print(f"  new breach after recovery; event(s)={len(events)}; expect ONE notification")
+
+
+def scenario_plan_activation(notifier: NotificationPort, delay: float) -> None:
+    print("\n=== Plan checkpoint activation in the same cycle ===")
+    base = datetime.now(UTC)
+    reset = base + timedelta(hours=6)
+    service = PlanAlertService(
+        notifier,
+        _plan_settings(reserve=None, checkpoint_hours=4, checkpoint_minimum="0.60"),
+    )
+    first = service.process(
+        _plan_snapshot("0.50", observed_at=base, resets_at=reset),
+        notifications_enabled=True,
+    )
+    print(f"  6h to reset, checkpoint inactive; event(s)={len(first)}")
+    time.sleep(delay)
+    second = service.process(
+        _plan_snapshot(
+            "0.50",
+            observed_at=base + timedelta(hours=3),
+            resets_at=reset,
+        ),
+        notifications_enabled=True,
+    )
+    print(f"  3h to reset, checkpoint active and below; event(s)={len(second)}; expect ONE")
 
 
 SCENARIOS: dict[str, Callable[[NotificationPort, float], None]] = {
@@ -211,13 +353,20 @@ SCENARIOS: dict[str, Callable[[NotificationPort, float], None]] = {
     "restart": scenario_restart,
     "multi-window": scenario_multi,
 }
+PLAN_SCENARIOS: dict[str, Callable[[NotificationPort, float], None]] = {
+    "plan-breach": scenario_plan_breach,
+    "plan-rearm": scenario_plan_rearm,
+    "plan-disabled": scenario_plan_disabled,
+    "plan-activation": scenario_plan_activation,
+}
 
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        description="Physical desktop-notification validation harness for REQ-ALERT-001."
+        description="Physical desktop-notification validation harness for usage and Plan alerts."
     )
-    parser.add_argument("scenario", choices=tuple(SCENARIOS) + ("failure", "all"))
+    choices = tuple(SCENARIOS) + tuple(PLAN_SCENARIOS) + ("failure", "all")
+    parser.add_argument("scenario", choices=choices)
     parser.add_argument("--delay", type=float, default=STEP_DELAY_SECONDS)
     return parser
 
@@ -233,10 +382,16 @@ def main(argv: list[str] | None = None) -> int:
         for name in SCENARIOS:
             SCENARIOS[name](notifier, args.delay)
             time.sleep(args.delay)
+        for name in PLAN_SCENARIOS:
+            PLAN_SCENARIOS[name](notifier, args.delay)
+            time.sleep(args.delay)
         scenario_failure(args.delay)
         return 0
 
-    SCENARIOS[args.scenario](notifier, args.delay)
+    if args.scenario in SCENARIOS:
+        SCENARIOS[args.scenario](notifier, args.delay)
+        return 0
+    PLAN_SCENARIOS[args.scenario](notifier, args.delay)
     return 0
 
 

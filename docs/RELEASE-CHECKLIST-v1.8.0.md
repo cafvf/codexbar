@@ -1,6 +1,6 @@
 # CodexBar v1.8.0 — Release Checklist
 
-Status: release preparation
+Status: release-prep CI green; evidence-closure/tag sequence pending
 Theme: Plan
 
 ## Code and behavior
@@ -62,26 +62,35 @@ Theme: Plan
 
 ## Final local gate
 
-- [x] pytest passes after version/lock/docs changes: 819 passed in 3.35 s.
+- [x] pytest passes after version/lock/docs changes: 819 passed.
 - [x] Ruff passes after version/lock/docs changes.
 - [x] strict mypy passes after version/lock/docs changes (89 source files).
 - [x] compileall passes after version/lock/docs changes.
 - [x] `git diff --check` passes.
 - [x] v1.8 release-contract architecture test passes.
 
-## Hosted gate
+## Hosted release-prep gate
 
-- [ ] Python 3.12 job green on exact release-prep commit.
-- [ ] Python 3.13 job green on exact release-prep commit.
-- [ ] Python 3.14 job green on exact release-prep commit.
-- [ ] isolated uv-tool version-mode job green on exact release-prep commit.
+Release-prep commit: `dd87b4716fe29c5d433704079b729338c42e33c4`
+GitHub Actions run: `31858424480`
+
+- [x] Python 3.12 job green on exact release-prep commit.
+- [x] Python 3.13 job green on exact release-prep commit.
+- [x] Python 3.14 job green on exact release-prep commit.
+- [x] isolated uv-tool version-mode job green on exact release-prep commit.
+- [x] workflow conclusion is SUCCESS.
 
 ## Git closure
 
 - [x] release-prep diff inspected; root README included only after deliberate reconciliation.
-- [ ] release-prep commit created and pushed.
-- [ ] remote `main` verified at release-prep commit.
-- [ ] hosted CI conclusion is success on that exact commit.
-- [ ] annotated tag `v1.8.0` created at the verified release commit.
+- [x] release-prep commit created and pushed.
+- [x] remote `main` verified at `dd87b4716fe29c5d433704079b729338c42e33c4`.
+- [x] hosted CI conclusion is success on that exact release-prep commit.
+- [ ] evidence-closure commit created and pushed.
+- [ ] remote `main` verified at the evidence-closure commit.
+- [ ] hosted CI succeeds on that exact evidence-closure commit.
+- [ ] annotated tag `v1.8.0` created at the verified evidence-closure commit.
 - [ ] tag pushed to `origin`.
 - [ ] remote tag verified.
+
+The evidence-closure commit must contain documentation/status changes only. Its future CI run ID is verified externally and is not embedded by another pre-tag mutation, avoiding an infinite evidence-update loop.

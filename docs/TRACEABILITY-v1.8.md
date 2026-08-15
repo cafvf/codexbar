@@ -1,6 +1,6 @@
 # CodexBar v1.8 — Release Traceability
 
-Status: implementation complete; release preparation
+Status: release-prep hosted gate green; final evidence-closure/tag sequence pending
 Theme: Plan
 Target release: v1.8.0
 Validated baseline: v1.7.0 — Diagnose
@@ -47,21 +47,46 @@ These are implementation-completion evidence.
 After release metadata and documentation integration:
 
 - `uv.lock` reflects local project version 1.8.0 with no dependency churn;
-- 819 pytest tests passed in 3.35 s;
+- 819 pytest tests passed;
 - Ruff, strict mypy, compileall and `git diff --check` passed;
 - uv-run, editable and isolated uv-tool modes all reported metadata/runtime 1.8.0;
 - the pre-existing expanded root README was preserved and reconciled with v1.8 Plan documentation;
 - the final concise Ubuntu/GNOME/Wayland release-candidate smoke passed.
 
-## Release blockers
+## Hosted release-prep evidence
 
-The remaining tag blockers are operational:
+Release-prep commit:
 
-- release-prep commit must be pushed and remote `main` verified;
-- hosted Python 3.12/3.13/3.14 quality jobs must succeed on that exact commit;
-- isolated uv-tool job must succeed on that exact commit;
-- any final evidence/status closure commit chosen as the tag target must itself pass the same hosted CI;
-- annotated tag `v1.8.0` may then be created only on that verified green commit, pushed and remotely verified.
+`dd87b4716fe29c5d433704079b729338c42e33c4`
+
+Remote `main` was verified at the same SHA.
+
+GitHub Actions run `31858424480` completed with conclusion **SUCCESS**.
+
+Jobs:
+
+- Python 3.12 — SUCCESS;
+- Python 3.13 — SUCCESS;
+- Python 3.14 — SUCCESS;
+- isolated uv-tool version mode — SUCCESS.
+
+The Python jobs each completed pytest, Ruff, strict mypy, compileall, architecture gates and project/editable release-version checks. The uv-tool job completed the isolated release-version validation.
+
+The release-prep hosted blocker is therefore closed.
+
+## Remaining tag blockers
+
+Only the final evidence-closure/tag sequence remains:
+
+- create and push the documentation-only evidence-closure commit;
+- verify remote `main` at that exact commit;
+- require the same hosted CI workflow to succeed on that exact commit;
+- create annotated tag `v1.8.0` only on that verified green commit;
+- push and remotely verify the tag.
+
+No further code, settings schema, version, lock, Plan behavior or README mutation is required before tagging.
+
+The future CI run ID of the evidence-closure commit is verified externally rather than embedded through another pre-tag documentation mutation. This keeps the tag target stable and avoids an infinite evidence-update loop.
 
 ## Exclusions preserved
 

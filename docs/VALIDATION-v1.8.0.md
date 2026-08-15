@@ -1,6 +1,6 @@
 # CodexBar v1.8.0 — Validation
 
-Status: release candidate — local release-prep gates green; hosted closure pending
+Status at evidence capture: release-prep hosted gate green; final tag-target verification required
 Release theme: Plan
 Target desktop: Ubuntu/GNOME/Wayland
 Validation date: 2026-08-14
@@ -99,7 +99,7 @@ No real reset credit is required or consumed for v1.8 Plan validation.
 The release-prep tree was validated after the version bump and lock regeneration:
 
 - `uv.lock` changed only the local editable CodexBar package from `1.7.0` to `1.8.0`; no dependency churn was introduced;
-- pytest: **819 passed in 3.35 s**;
+- pytest: **819 passed**;
 - Ruff pre/post checks: PASS;
 - strict mypy: PASS over 89 source files;
 - compileall: PASS;
@@ -112,7 +112,7 @@ Release-version authority validation reports `1.8.0` consistently in all three m
 - editable: metadata/runtime 1.8.0 — PASS;
 - isolated `uv-tool`: metadata/runtime 1.8.0 — PASS.
 
-The hosted workflow now uses the release-neutral `scripts/validate_release_version_modes.py` entry point.
+The hosted workflow uses the release-neutral `scripts/validate_release_version_modes.py` entry point.
 
 ## Final release-candidate physical smoke
 
@@ -142,22 +142,39 @@ The pre-existing local README expansion was reconstructed exactly from its origi
 
 This closes the README ownership constraint without blind replacement.
 
-## Hosted CI
+## Hosted release-prep CI evidence
 
-The existing hosted gate covers Python 3.12, 3.13 and 3.14 with pytest, Ruff, strict mypy, compileall, architecture gates and project/editable version authority. A separate Python 3.14 job validates the isolated uv-tool mode.
+Release-prep commit:
 
-Final hosted evidence: **PENDING** until the exact final release-prep commit is pushed.
+`dd87b4716fe29c5d433704079b729338c42e33c4`
 
-## Release decision
+Remote `main` was verified at the same commit.
 
-Implementation behavior and the completed v1.8 physical Plan checks are green.
+GitHub Actions run:
 
-The local automated, version-authority and target physical gates are green.
+`31858424480` — **SUCCESS**
 
-The release remains **NOT TAG-READY** until:
+The run was triggered by the push of the exact release-prep commit and completed successfully.
 
-1. the exact release-prep commit is pushed;
-2. remote `main` is verified at that commit;
-3. hosted Python 3.12/3.13/3.14 and isolated uv-tool jobs succeed on that exact commit.
+Hosted jobs:
 
-After hosted closure, release-status documentation may be finalized and must itself pass CI on the exact commit chosen for the annotated `v1.8.0` tag. The tag is never created on an unverified commit.
+- Python 3.12 — SUCCESS (job `94947313261`);
+- Python 3.13 — SUCCESS (job `94947313317`);
+- Python 3.14 — SUCCESS (job `94947313325`);
+- isolated uv-tool version mode — SUCCESS (job `94947313274`).
+
+Each Python matrix job completed the hosted pytest, Ruff, strict mypy, compileall, architecture-gate and project/editable version-authority steps successfully. The separate uv-tool job completed the release-neutral isolated installation/version check successfully.
+
+This closes the hosted gate for the release-prep commit.
+
+## Final tag-target rule
+
+The release-prep commit is fully green locally, physically and in hosted CI.
+
+This evidence-closure documentation is intended to become the final tag-target commit. The annotated `v1.8.0` tag is authorized only after:
+
+1. the evidence-closure commit is created and pushed;
+2. remote `main` is verified at that exact commit;
+3. the same hosted CI workflow succeeds on that exact commit.
+
+No additional code, version, lock or behavioral change is required for this closure. The CI result for the evidence-closure commit is intentionally verified externally after the commit exists; the documentation must not be mutated again merely to embed its own future run ID before tagging.

@@ -13,6 +13,7 @@ from codexbar.application.settings import GetSettings, ResetSettings, SettingsLo
 from codexbar.application.use_cases import GetCurrentUsage
 from codexbar.composition import build_gui_runtime, build_usage_provider
 from codexbar.domain.errors import CodexBarError, SettingsError
+from codexbar.domain.quantities import TimeToReset
 from codexbar.infrastructure.diagnostics import build_doctor_service
 from codexbar.infrastructure.history_paths import history_database_path
 from codexbar.infrastructure.history_sqlite import SqliteHistoryRepository
@@ -93,6 +94,11 @@ def _format_percent(value: Decimal) -> str:
     return format(percent.normalize(), "f")
 
 
+def _time_to_reset_seconds(value: TimeToReset) -> int:
+    duration = value.duration
+    return duration.days * 86_400 + duration.seconds
+
+
 def _print_settings(result: SettingsLoadResult) -> None:
     settings = result.settings
     print(f"Origin: {result.origin.value}")
@@ -103,13 +109,31 @@ def _print_settings(result: SettingsLoadResult) -> None:
     print(f"Refresh interval: {settings.refresh_interval_seconds.value} seconds")
     notifications = "enabled" if settings.notifications_enabled else "disabled"
     print(f"Notifications: {notifications}")
+    plan_notifications = (
+        "enabled" if settings.plan_breach_notifications_enabled else "disabled"
+    )
+    print(f"Plan breach notifications: {plan_notifications}")
     print(f"Settings schema source: {result.source_schema_version or 'defaults'}")
     if not settings.usage_reserves.entries:
         print("Usage reserves: none")
     else:
         print("Usage reserves:")
-        for entry in settings.usage_reserves.entries:
-            print(f"  {entry.window_id.value}: {_format_percent(entry.reserve.value)}%")
+        for reserve_entry in settings.usage_reserves.entries:
+            print(
+                f"  {reserve_entry.window_id.value}: "
+                f"{_format_percent(reserve_entry.reserve.value)}%"
+            )
+    if not settings.usage_plan_checkpoints.entries:
+        print("Usage Plan checkpoints: none")
+    else:
+        print("Usage Plan checkpoints:")
+        for checkpoint_entry in settings.usage_plan_checkpoints.entries:
+            seconds = _time_to_reset_seconds(checkpoint_entry.time_to_reset)
+            minimum = _format_percent(checkpoint_entry.minimum_remaining.value)
+            print(
+                f"  {checkpoint_entry.window_id.value}: {seconds} seconds -> "
+                f"minimum {minimum}%"
+            )
     if result.diagnostic is not None:
         print(f"Diagnostic: {result.diagnostic}")
 

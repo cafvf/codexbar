@@ -80,7 +80,7 @@ def refresh_once(controller: TrayController) -> None:
     controller.poll()
 
 
-def test_inv_alert_004_settings_save_preserves_alert_values_in_schema_v2(
+def test_inv_alert_004_settings_save_preserves_alert_values_in_schema_v3(
     tmp_path: Path,
 ) -> None:
     repository = JsonSettingsRepository(
@@ -91,11 +91,13 @@ def test_inv_alert_004_settings_save_preserves_alert_values_in_schema_v2(
     payload = json.loads(repository.path.read_text(encoding="utf-8"))
 
     assert payload == {
-        "schema_version": 2,
+        "schema_version": 3,
         "low_remaining_threshold": "0.20",
         "refresh_interval_seconds": 60,
         "notifications_enabled": True,
         "usage_reserves": {},
+        "usage_plan_checkpoints": {},
+        "plan_breach_notifications_enabled": False,
     }
 
 

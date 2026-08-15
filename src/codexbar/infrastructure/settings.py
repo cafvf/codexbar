@@ -5,6 +5,7 @@ import os
 import tempfile
 from collections.abc import Mapping
 from contextlib import suppress
+from datetime import timedelta
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
 from typing import Any
@@ -17,14 +18,17 @@ from codexbar.domain.errors import (
     SettingsWriteError,
 )
 from codexbar.domain.models import Fraction, UsageWindowId
+from codexbar.domain.quantities import TimeToReset
 from codexbar.domain.settings import (
     AppSettings,
     RefreshIntervalSeconds,
+    UsagePlanCheckpoint,
+    UsagePlanCheckpointPolicy,
     UsageReserve,
     UsageReservePolicy,
 )
 
-_SCHEMA_VERSION = 2
+_SCHEMA_VERSION = 3
 _SCHEMA_1_KEYS = frozenset(
     {
         "schema_version",
@@ -34,6 +38,16 @@ _SCHEMA_1_KEYS = frozenset(
     }
 )
 _SCHEMA_2_KEYS = _SCHEMA_1_KEYS | {"usage_reserves"}
+_SCHEMA_3_KEYS = _SCHEMA_2_KEYS | {
+    "usage_plan_checkpoints",
+    "plan_breach_notifications_enabled",
+}
+_CHECKPOINT_KEYS = frozenset(
+    {
+        "time_to_reset_seconds",
+        "minimum_remaining",
+    }
+)
 
 
 class JsonSettingsRepository:
@@ -146,6 +160,15 @@ def _is_snap_scoped(path: Path, home: Path) -> bool:
 
 
 def _encode_settings(settings: AppSettings) -> dict[str, object]:
+    checkpoints: dict[str, list[dict[str, object]]] = {}
+    for entry in settings.usage_plan_checkpoints.entries:
+        checkpoints.setdefault(entry.window_id.value, []).append(
+            {
+                "time_to_reset_seconds": _time_to_reset_seconds(entry.time_to_reset),
+                "minimum_remaining": str(entry.minimum_remaining.value),
+            }
+        )
+
     return {
         "schema_version": _SCHEMA_VERSION,
         "low_remaining_threshold": str(settings.low_remaining_threshold.value),
@@ -158,6 +181,13 @@ def _encode_settings(settings: AppSettings) -> dict[str, object]:
                 key=lambda item: item.window_id.value,
             )
         },
+        "usage_plan_checkpoints": {
+            window_id: checkpoints[window_id]
+            for window_id in sorted(checkpoints)
+        },
+        "plan_breach_notifications_enabled": (
+            settings.plan_breach_notifications_enabled
+        ),
     }
 
 
@@ -174,9 +204,23 @@ def _decode_settings(payload: Any) -> tuple[AppSettings, int]:
     if schema_version == 1:
         _validate_keys(payload, _SCHEMA_1_KEYS)
         reserves = UsageReservePolicy()
+        checkpoints = UsagePlanCheckpointPolicy()
+        plan_breach_notifications_enabled = False
     elif schema_version == 2:
         _validate_keys(payload, _SCHEMA_2_KEYS)
         reserves = _decode_usage_reserves(payload["usage_reserves"])
+        checkpoints = UsagePlanCheckpointPolicy()
+        plan_breach_notifications_enabled = False
+    elif schema_version == 3:
+        _validate_keys(payload, _SCHEMA_3_KEYS)
+        reserves = _decode_usage_reserves(payload["usage_reserves"])
+        checkpoints = _decode_usage_plan_checkpoints(
+            payload["usage_plan_checkpoints"]
+        )
+        plan_breach_notifications_enabled = _decode_boolean(
+            payload["plan_breach_notifications_enabled"],
+            "plan_breach_notifications_enabled",
+        )
     else:
         raise SettingsSchemaError(
             f"unsupported settings schema version: {schema_version!r}"
@@ -191,16 +235,19 @@ def _decode_settings(payload: Any) -> tuple[AppSettings, int]:
     if isinstance(refresh_raw, bool) or not isinstance(refresh_raw, int):
         raise SettingsDocumentError("refresh_interval_seconds must be an integer")
 
-    notifications_raw = payload["notifications_enabled"]
-    if not isinstance(notifications_raw, bool):
-        raise SettingsDocumentError("notifications_enabled must be a boolean")
+    notifications_enabled = _decode_boolean(
+        payload["notifications_enabled"],
+        "notifications_enabled",
+    )
 
     try:
         settings = AppSettings(
             low_remaining_threshold=threshold,
             refresh_interval_seconds=RefreshIntervalSeconds(refresh_raw),
-            notifications_enabled=notifications_raw,
+            notifications_enabled=notifications_enabled,
             usage_reserves=reserves,
+            usage_plan_checkpoints=checkpoints,
+            plan_breach_notifications_enabled=plan_breach_notifications_enabled,
         )
     except ValueError as exc:
         raise SettingsDocumentError(f"invalid settings value: {exc}") from exc
@@ -221,6 +268,12 @@ def _validate_keys(payload: dict[str, Any], expected: frozenset[str]) -> None:
     raise SettingsSchemaError(
         "; ".join(detail) or "settings fields do not match schema"
     )
+
+
+def _decode_boolean(value: object, field: str) -> bool:
+    if not isinstance(value, bool):
+        raise SettingsDocumentError(f"{field} must be a boolean")
+    return value
 
 
 def _decode_fraction_string(value: object, field: str) -> Fraction:
@@ -258,3 +311,72 @@ def _decode_usage_reserves(value: object) -> UsageReservePolicy:
     return UsageReservePolicy(
         tuple(sorted(entries, key=lambda item: item.window_id.value))
     )
+
+
+def _decode_usage_plan_checkpoints(value: object) -> UsagePlanCheckpointPolicy:
+    if not isinstance(value, dict):
+        raise SettingsDocumentError("usage_plan_checkpoints must be an object")
+
+    entries: list[UsagePlanCheckpoint] = []
+    for raw_window_id, raw_checkpoints in value.items():
+        if not isinstance(raw_window_id, str) or not raw_window_id.strip():
+            raise SettingsDocumentError(
+                "usage_plan_checkpoints keys must be non-empty window-id strings"
+            )
+        if not isinstance(raw_checkpoints, list):
+            raise SettingsDocumentError(
+                f"usage_plan_checkpoints[{raw_window_id!r}] must be an array"
+            )
+
+        try:
+            window_id = UsageWindowId(raw_window_id)
+        except ValueError as exc:
+            raise SettingsDocumentError(
+                f"invalid usage plan window id {raw_window_id!r}: {exc}"
+            ) from exc
+
+        for index, raw_checkpoint in enumerate(raw_checkpoints):
+            field = f"usage_plan_checkpoints[{raw_window_id!r}][{index}]"
+            if not isinstance(raw_checkpoint, dict):
+                raise SettingsDocumentError(f"{field} must be an object")
+            _validate_keys(raw_checkpoint, _CHECKPOINT_KEYS)
+
+            raw_seconds = raw_checkpoint["time_to_reset_seconds"]
+            if (
+                isinstance(raw_seconds, bool)
+                or not isinstance(raw_seconds, int)
+                or raw_seconds < 0
+            ):
+                raise SettingsDocumentError(
+                    f"{field}.time_to_reset_seconds must be a non-negative integer"
+                )
+
+            minimum = _decode_fraction_string(
+                raw_checkpoint["minimum_remaining"],
+                f"{field}.minimum_remaining",
+            )
+            try:
+                time_to_reset = TimeToReset(timedelta(seconds=raw_seconds))
+            except (OverflowError, ValueError) as exc:
+                raise SettingsDocumentError(
+                    f"{field}.time_to_reset_seconds is outside the supported range"
+                ) from exc
+            entries.append(
+                UsagePlanCheckpoint(
+                    window_id=window_id,
+                    time_to_reset=time_to_reset,
+                    minimum_remaining=minimum,
+                )
+            )
+
+    try:
+        return UsagePlanCheckpointPolicy(tuple(entries))
+    except ValueError as exc:
+        raise SettingsDocumentError(f"invalid usage plan checkpoints: {exc}") from exc
+
+
+def _time_to_reset_seconds(value: TimeToReset) -> int:
+    duration = value.duration
+    if duration.microseconds != 0:
+        raise ValueError("persisted plan checkpoint must use whole seconds")
+    return duration.days * 86_400 + duration.seconds

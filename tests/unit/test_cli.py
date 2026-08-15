@@ -1,6 +1,11 @@
+from datetime import timedelta
+from decimal import Decimal
 from pathlib import Path
 
 from codexbar.__main__ import main
+from codexbar.domain.models import Fraction, UsageWindowId
+from codexbar.domain.quantities import TimeToReset
+from codexbar.domain.settings import UsagePlanCheckpoint, UsagePlanCheckpointPolicy
 from codexbar.infrastructure.settings import JsonSettingsRepository
 
 
@@ -26,6 +31,9 @@ def test_settings_show_reports_defaults_and_origin(
     assert "LOW remaining threshold: 20%" in output
     assert "Refresh interval: 60 seconds" in output
     assert "Notifications: enabled" in output
+    assert "Plan breach notifications: disabled" in output
+    assert "Settings schema source: defaults" in output
+    assert "Usage Plan checkpoints: none" in output
 
 
 def test_settings_show_reports_persisted_origin(
@@ -55,6 +63,48 @@ def test_settings_show_reports_persisted_origin(
     assert "LOW remaining threshold: 12%" in output
     assert "Refresh interval: 180 seconds" in output
     assert "Notifications: disabled" in output
+    assert "Plan breach notifications: disabled" in output
+    assert "Settings schema source: 1" in output
+    assert "Usage Plan checkpoints: none" in output
+
+
+def test_settings_show_reports_plan_configuration_deterministically(
+    tmp_path: Path,
+    monkeypatch,
+    capsys,
+) -> None:
+    monkeypatch.setenv("HOME", str(tmp_path))
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "config"))
+    repository = JsonSettingsRepository()
+    weekly = UsageWindowId("opaque-weekly")
+    settings = repository.load().settings.with_usage_plan_checkpoints(
+        UsagePlanCheckpointPolicy(
+            (
+                UsagePlanCheckpoint(
+                    weekly,
+                    TimeToReset(timedelta(hours=24)),
+                    Fraction(Decimal("0.30")),
+                ),
+                UsagePlanCheckpoint(
+                    weekly,
+                    TimeToReset(timedelta(hours=72)),
+                    Fraction(Decimal("0.55")),
+                ),
+            )
+        )
+    ).with_plan_breach_notifications_enabled(True)
+    repository.save(settings)
+
+    assert main(["settings", "show"]) == 0
+
+    output = capsys.readouterr().out
+    assert "Origin: persisted" in output
+    assert "Settings schema source: 3" in output
+    assert "Plan breach notifications: enabled" in output
+    assert "Usage Plan checkpoints:" in output
+    assert "opaque-weekly: 259200 seconds -> minimum 55%" in output
+    assert "opaque-weekly: 86400 seconds -> minimum 30%" in output
+    assert output.index("259200 seconds") < output.index("86400 seconds")
 
 
 def test_settings_show_surfaces_diagnostic_without_crashing(

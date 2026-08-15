@@ -46,13 +46,15 @@ def test_valid_document_round_trips_without_float_conversion(tmp_path: Path) -> 
     payload = json.loads((tmp_path / "config/codexbar/settings.json").read_text())
 
     assert result.settings == expected
-    assert result.source_schema_version == 2
+    assert result.source_schema_version == 3
     assert payload == {
-        "schema_version": 2,
+        "schema_version": 3,
         "low_remaining_threshold": "0.15",
         "refresh_interval_seconds": 120,
         "notifications_enabled": False,
         "usage_reserves": {},
+        "usage_plan_checkpoints": {},
+        "plan_breach_notifications_enabled": False,
     }
 
 

@@ -26,10 +26,12 @@ SETTINGS_KEYS = {
     "refresh_interval_seconds",
     "notifications_enabled",
     "usage_reserves",
+    "usage_plan_checkpoints",
+    "plan_breach_notifications_enabled",
 }
 
 
-def test_regression_settings_schema_v2_has_no_history_fields(
+def test_regression_settings_schema_v3_has_no_history_fields(
     tmp_path,
 ) -> None:
     repository = JsonSettingsRepository(
@@ -43,8 +45,10 @@ def test_regression_settings_schema_v2_has_no_history_fields(
     payload = json.loads(repository.path.read_text(encoding="utf-8"))
 
     assert set(payload) == SETTINGS_KEYS
-    assert payload["schema_version"] == 2
+    assert payload["schema_version"] == 3
     assert payload["usage_reserves"] == {}
+    assert payload["usage_plan_checkpoints"] == {}
+    assert payload["plan_breach_notifications_enabled"] is False
     assert not any("history" in key for key in payload)
 
 

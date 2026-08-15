@@ -1,8 +1,8 @@
 # CodexBar Product Roadmap
 
 Status: active planning roadmap
-Current validated release: v1.7.0 — Diagnose
-Release candidate: v1.8.0 — Plan
+Current validated release: v1.8.0 — Plan
+Next roadmap item: v1.9 — Explore
 Last reviewed: 2026-08-14
 
 ## Product progression
@@ -17,7 +17,7 @@ Last reviewed: 2026-08-14
 | v1.5 | Control | What deterministic reserve/reset actions are available? | Released |
 | v1.6 | Context | How does Current compare with independent prior cycles? | Released |
 | v1.7 | Diagnose | Is CodexBar healthy, coherent, responsive, and explainable? | Released |
-| v1.8 | Plan | How does Current compare with explicit user-defined checkpoints and reserves? | Release preparation |
+| v1.8 | Plan | How does Current compare with explicit user-defined checkpoints and reserves? | Released |
 | v1.9 | Explore | Why did Context choose this evidence and how do cycles compare? | Proposed |
 | v2.0 | Activity | How does observed Codex activity organize into sessions/work patterns? | Research horizon |
 
@@ -60,7 +60,7 @@ See `docs/specs/v1.7/PLANNING.md`.
 
 ## v1.8 — Plan
 
-Status: implementation complete; release preparation for `v1.8.0`.
+Status: released as `v1.8.0` on 2026-08-14.
 
 Primary intent:
 
@@ -70,7 +70,7 @@ Product question:
 
 > How does Current compare with the plan I explicitly configured for this window?
 
-Implemented v1.8 direction:
+Released v1.8 capabilities:
 
 - explicit checkpoint policy by opaque `UsageWindowId`;
 - checkpoint floors expressed as whole-second time-to-reset coordinates plus minimum remaining fraction;
@@ -109,11 +109,11 @@ Example framing:
 
 This is a deterministic comparison between an observed fact and an explicit user policy. It is not a consumption forecast.
 
-Release-preparation evidence is maintained in `docs/TRACEABILITY-v1.8.md`, `docs/VALIDATION-v1.8.0.md` and `docs/RELEASE-CHECKLIST-v1.8.0.md`. v1.8 becomes Released only after the final exact commit passes hosted CI and is tagged `v1.8.0`.
+Release evidence is maintained in `docs/TRACEABILITY-v1.8.md`, `docs/VALIDATION-v1.8.0.md` and `docs/RELEASE-CHECKLIST-v1.8.0.md`. The annotated `v1.8.0` tag points to commit `8edf0154f80862c283ea20f5f2e9e5fcbca8e734`.
 
 Dependency note:
 
-v1.8 Plan depends primarily on capabilities already stabilized through v1.7: dynamic `UsageWindowId`, Current authority, Settings, Control/Budget, alerts, reset-credit capability representation, asynchronous runtime foundations, diagnostics and hosted release gates. It does not require the richer Historical Context exploration proposed for v1.9.
+v1.8 Plan depends primarily on capabilities stabilized through v1.7: dynamic `UsageWindowId`, Current authority, Settings, Control/Budget, alerts, reset-credit capability representation, asynchronous runtime foundations, diagnostics and hosted release gates. It does not require the richer Historical Context exploration proposed for v1.9.
 
 ## v1.9 — Explore
 
@@ -154,23 +154,21 @@ The roadmap originally listed Explore as v1.8 and Plan as v1.9.
 
 After v1.7 runtime/diagnostic closure, the dependency graph was reviewed and the order was intentionally inverted:
 
-- v1.8 is now **Plan**;
-- v1.9 is now **Explore**.
+- v1.8 became **Plan**;
+- v1.9 remains **Explore**.
 
 Rationale:
 
-1. Plan depends mostly on capabilities already mature in v1.7: Current, dynamic window identity, Settings, Control/Budget, alerts, reset-credit capabilities, diagnostics and asynchronous runtime foundations.
-2. Plan does not require explainable cycle selection, Cycle Explorer or expanded History views.
+1. Plan depended mostly on capabilities already mature in v1.7: Current, dynamic window identity, Settings, Control/Budget, alerts, reset-credit capabilities, diagnostics and asynchronous runtime foundations.
+2. Plan did not require explainable cycle selection, Cycle Explorer or expanded History views.
 3. Explore benefits from additional retained real History and can follow without losing semantic integrity.
-4. Version numbers remain monotonic; the project will not release v1.9 before v1.8 and later “return” to an older version number.
+4. Version numbers remain monotonic.
 
-The two releases remain architecturally adjacent rather than strictly chained:
+The release sequence is now:
 
-`v1.7 Diagnose -> v1.8 Plan`
-and
-`v1.7 Diagnose -> v1.9 Explore`.
+`v1.7 Diagnose -> v1.8 Plan -> v1.9 Explore`.
 
-No dependency is introduced from Historical Context into Plan authority.
+Explore remains semantically independent of Plan authority even though it follows v1.8 in the release sequence.
 
 ## v2.0 — Activity research horizon
 

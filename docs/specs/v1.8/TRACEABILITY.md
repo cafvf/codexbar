@@ -1,11 +1,12 @@
 # CodexBar v1.8 — Implementation traceability
 
-Status: implementation complete; release preparation
+Status: release validated
 Theme: Plan
 Baseline release: v1.7.0 — Diagnose
-Release candidate: v1.8.0
+Released as: v1.8.0
+Tag target: `8edf0154f80862c283ea20f5f2e9e5fcbca8e734`
 
-This matrix closes the frozen `REQ-PLAN-*`, `UC-1801..1809`, `AC-1801..1838` and `INV-PLAN-*` contracts against the implementation and evidence that actually shipped into the v1.8 release-preparation branch.
+This matrix closes the frozen `REQ-PLAN-*`, `UC-1801..1809`, `AC-1801..1838` and `INV-PLAN-*` contracts against the implementation and evidence that shipped in v1.8.0.
 
 ## Acceptance-criterion closure
 
@@ -48,7 +49,7 @@ This matrix closes the frozen `REQ-PLAN-*`, `UC-1801..1809`, `AC-1801..1838` and
 | AC-1835 | REQ-PLAN-008 / UC-1809 | no Plan-to-redeem/reset-ledger authority | `tests/architecture/test_v18_plan_architecture.py`, `tests/architecture/test_no_automatic_redeem.py` | INV-PLAN-004 | covered |
 | AC-1836 | REQ-PLAN-008 / UC-1809 | opaque `UsageWindowId` in Plan core | `tests/architecture/test_v18_plan_architecture.py`, `tests/unit/test_plan.py` | INV-PLAN-007 | covered |
 | AC-1837 | REQ-PLAN-008 / UC-1809 | no predictive Plan surface | `tests/architecture/test_v18_plan_architecture.py` | source/spec review | covered |
-| AC-1838 | REQ-PLAN-008 / UC-1809 | protected v1.0–v1.7 regression families | full `pytest` suite + existing architecture/GUI/acceptance families | pre-release-prep gate: 815 passed | covered; final release gate pending |
+| AC-1838 | REQ-PLAN-008 / UC-1809 | protected v1.0–v1.7 regression families | full `pytest` suite + existing architecture/GUI/acceptance families | 819-test final local gate + hosted tag-target CI | covered; release gate passed |
 
 ## Requirement closure
 
@@ -61,7 +62,7 @@ This matrix closes the frozen `REQ-PLAN-*`, `UC-1801..1809`, `AC-1801..1838` and
 | REQ-PLAN-005 | AC-1818..1821 | implemented and physically validated |
 | REQ-PLAN-006 | AC-1822..1830, A01..A10 | implemented and physically validated |
 | REQ-PLAN-007 | AC-1818, AC-1831..1832 | implemented |
-| REQ-PLAN-008 | AC-1833..1838 | protected; final full release gate pending |
+| REQ-PLAN-008 | AC-1833..1838 | protected; final release gate passed |
 
 ## Architectural invariants
 
@@ -75,7 +76,7 @@ This matrix closes the frozen `REQ-PLAN-*`, `UC-1801..1809`, `AC-1801..1838` and
 | INV-PLAN-006 — Budget remains Plan-independent | Budget import/source assertion + released budget vectors | protected |
 | INV-PLAN-007 — opaque window identity | string/import checks + opaque-ID unit vectors | protected |
 
-## Physical evidence already completed
+## Physical evidence
 
 On target Ubuntu/GNOME/Wayland:
 
@@ -86,18 +87,23 @@ On target Ubuntu/GNOME/Wayland:
 - Budget remained reserve-only when Plan checkpoint floor differed materially from the reserve;
 - Plan breach, recovery/rearm, disabled/no-replay and checkpoint-activation notification scenarios passed;
 - existing LOW/dedupe/disabled/multi-window notification scenarios remained green;
+- final native/window lifecycle smoke passed;
 - no real reset credit was consumed.
 
-Native Ayatana/Qt fallback remains a protected product contract. v1.8 changes do not replace that architecture. A destructive package-removal exercise is not required merely to force fallback; final Phase-F target smoke records what can be safely exercised on the target.
+Native Ayatana/Qt fallback remains a protected product contract. v1.8 changes do not replace that architecture. A destructive package-removal exercise was not required merely to force fallback.
 
-## Release closure still required
+## Release closure evidence
 
-This file establishes implementation traceability, not release publication. Remaining release gates are tracked in `docs/RELEASE-CHECKLIST-v1.8.0.md` and include:
+The implementation and release chain closed as follows:
 
-1. regenerate and verify `uv.lock` after the 1.8.0 version bump;
-2. final post-bump local gate;
-3. release-version validation in uv-run, editable and isolated uv-tool modes;
-4. deliberate reconciliation of the user-owned root `README.md`;
-5. exact release-prep commit/push;
-6. hosted Python 3.12/3.13/3.14 and uv-tool CI success on that exact commit;
-7. annotated `v1.8.0` tag creation/push/remote verification.
+1. implementation-complete commit `b8b83abe4fae33ed873e33cb1a3c5462366266dd`;
+2. release-prep commit `dd87b4716fe29c5d433704079b729338c42e33c4`;
+3. local post-bump gate: 819 tests plus Ruff/mypy/compileall/diff check;
+4. release-version validation: uv-run, editable and isolated uv-tool all reported 1.8.0;
+5. hosted release-prep run `31858424480`: SUCCESS;
+6. evidence-closure/tag-target commit `8edf0154f80862c283ea20f5f2e9e5fcbca8e734`;
+7. hosted tag-target run `31858617233`: SUCCESS;
+8. annotated `v1.8.0` tag remotely verified;
+9. remote tag object `47411ee438fdb10745a5bd1fdce1d76067ab4cee` points to the exact green tag-target commit.
+
+Release publication is complete.

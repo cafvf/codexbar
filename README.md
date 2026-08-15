@@ -2,8 +2,8 @@
 
 CodexBar is a Linux tray application for monitoring Codex usage, retaining bounded observational history, and exposing explicit reset-credit control when the local Codex app-server provides that capability.
 
-Current validated release: **1.7.0 — Diagnose**.
-Release candidate: **1.8.0 — Plan**.
+Current validated release: **1.8.0 — Plan**.
+Next roadmap item: **v1.9 — Explore**.
 
 ## What CodexBar does
 
@@ -73,12 +73,12 @@ git clone https://github.com/cafvf/codexbar.git
 cd codexbar
 ```
 
-For a released version, select its tag before installing. For example, once
-v1.7.0 is released:
+For a released version, select its tag before installing. For the current
+validated release:
 
 ```bash
 git fetch --tags
-git checkout v1.7.0
+git checkout v1.8.0
 ```
 
 ### 2. Install the application

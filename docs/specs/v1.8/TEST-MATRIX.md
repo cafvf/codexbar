@@ -1,6 +1,6 @@
 # CodexBar v1.8 — Test strategy and matrix
 
-Status: implementation complete; release preparation
+Status: release validated
 
 ## 1. Harness objective
 
@@ -109,7 +109,7 @@ Protects:
 
 `tests/architecture/test_v18_release_contract.py`
 
-Protects release-prep version/document/CI coherence without asserting that the release tag already exists.
+Protects release-version/document/CI coherence for the released v1.8 line.
 
 ## 3. Existing tests extended, not duplicated
 
@@ -289,7 +289,7 @@ All are mapped in `docs/specs/v1.8/TRACEABILITY.md`.
 
 ## 8. Mandatory existing regression families
 
-Remain release-blocking:
+Release-blocking families included:
 
 - app-server source fixtures;
 - refresh/current STALE and fail-closed behavior;
@@ -310,7 +310,7 @@ Remain release-blocking:
 - CLI;
 - hosted Python 3.12/3.13/3.14 CI contract.
 
-The pre-release-prep v1.8 implementation baseline passed 815 tests. The final post-bump suite remains mandatory.
+The pre-release-prep v1.8 implementation baseline passed 815 tests. The final post-bump local suite passed 819 tests.
 
 ## 9. Physical target validation
 
@@ -327,15 +327,16 @@ Completed on target Ubuntu/GNOME/Wayland:
 9. Current Details remained visually stable through the tested lifecycle;
 10. native indicator remained usage-focused during Plan validation;
 11. no duplicate-owner regression was observed in the Plan workflow;
-12. no real reset credit was required.
+12. final native/window lifecycle release-candidate smoke passed;
+13. no real reset credit was required.
 
-Release-prep still requires a concise final native/window lifecycle smoke. Qt fallback remains protected by automated/released evidence; do not remove system packages merely to manufacture a physical fallback event.
+Qt fallback remains protected by automated/released evidence; system packages were not removed merely to manufacture a physical fallback event.
 
-Real redeem remains optional because it is destructive/consumes a real credit; mock post-redeem adoption is sufficient for v1.8 Plan integration.
+Real redeem remained optional because it is destructive/consumes a real credit; mock post-redeem adoption was sufficient for v1.8 Plan integration.
 
-## 10. Full gate
+## 10. Release gate
 
-Before release-prep commit:
+The release-prep gate used:
 
 ```bash
 uv run ruff check src tests scripts --fix
@@ -346,13 +347,20 @@ uv run python -m compileall -q src scripts
 git diff --check
 ```
 
-After the version bump also run:
+After the version bump:
 
 ```bash
 uv lock
 uv run python scripts/validate_release_version_modes.py
 ```
 
-The final exact release-prep commit must then pass hosted Python 3.12/3.13/3.14 quality jobs and the isolated uv-tool version-mode job before tag creation.
+Final results:
 
-A new dependency is not justified by the v1.8 test plan.
+- local post-bump suite: 819 passed;
+- release-prep hosted run `31858424480`: SUCCESS;
+- evidence-closure/tag-target hosted run `31858617233`: SUCCESS;
+- Python 3.12/3.13/3.14 jobs: SUCCESS;
+- isolated uv-tool version-mode job: SUCCESS;
+- annotated tag `v1.8.0` points to `8edf0154f80862c283ea20f5f2e9e5fcbca8e734`.
+
+A new dependency was not justified by the v1.8 test plan.

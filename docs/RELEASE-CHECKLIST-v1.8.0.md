@@ -1,7 +1,9 @@
 # CodexBar v1.8.0 — Release Checklist
 
-Status: release-prep CI green; evidence-closure/tag sequence pending
+Status: released
 Theme: Plan
+Release date: 2026-08-14
+Tag: `v1.8.0`
 
 ## Code and behavior
 
@@ -42,17 +44,17 @@ Theme: Plan
 ## Traceability and documentation
 
 - [x] `docs/specs/v1.8/TRACEABILITY.md` maps AC-1801..1838 and INV-PLAN-001..007 to actual evidence.
-- [x] `docs/TRACEABILITY-v1.8.md` prepared.
-- [x] `docs/VALIDATION-v1.8.0.md` prepared.
-- [x] `PRODUCT_SPEC.md` moved to implementation-complete/release-prep status without claiming release.
-- [x] `docs/ROADMAP.md` marks v1.8 as release preparation and preserves v1.9 Explore ordering.
-- [x] `CHANGELOG.md` contains the 1.8.0 Plan release-candidate entry.
+- [x] `docs/TRACEABILITY-v1.8.md` closed with release evidence.
+- [x] `docs/VALIDATION-v1.8.0.md` closed with local, hosted, physical and tag evidence.
+- [x] `PRODUCT_SPEC.md` identifies v1.8.0 as the current validated release.
+- [x] `docs/ROADMAP.md` marks v1.8 as Released and preserves v1.9 Explore ordering.
+- [x] `CHANGELOG.md` identifies 1.8.0 as the validated Plan release.
 - [x] v1.8 test matrix names the actual PlanPanel test files.
-- [x] Root `README.md` reconciled deliberately against the pre-existing local expansion without discarding it.
+- [x] Root `README.md` was reconciled deliberately against the pre-existing local expansion without discarding it.
 
 ## Release metadata
 
-- [x] `pyproject.toml` release candidate version is `1.8.0`.
+- [x] `pyproject.toml` release version is `1.8.0`.
 - [x] `uv.lock` regenerated; only the local CodexBar package changed from 1.7.0 to 1.8.0.
 - [x] runtime package version continues to derive from package metadata.
 - [x] hosted CI uses `scripts/validate_release_version_modes.py` rather than a release-number-specific validator.
@@ -80,17 +82,42 @@ GitHub Actions run: `31858424480`
 - [x] isolated uv-tool version-mode job green on exact release-prep commit.
 - [x] workflow conclusion is SUCCESS.
 
-## Git closure
+## Final tag-target hosted gate
+
+Evidence-closure/tag-target commit: `8edf0154f80862c283ea20f5f2e9e5fcbca8e734`
+GitHub Actions run: `31858617233`
+
+- [x] Python 3.12 job green on exact tag-target commit.
+- [x] Python 3.13 job green on exact tag-target commit.
+- [x] Python 3.14 job green on exact tag-target commit.
+- [x] isolated uv-tool version-mode job green on exact tag-target commit.
+- [x] workflow conclusion is SUCCESS.
+
+## Git and tag closure
 
 - [x] release-prep diff inspected; root README included only after deliberate reconciliation.
 - [x] release-prep commit created and pushed.
 - [x] remote `main` verified at `dd87b4716fe29c5d433704079b729338c42e33c4`.
-- [x] hosted CI conclusion is success on that exact release-prep commit.
-- [ ] evidence-closure commit created and pushed.
-- [ ] remote `main` verified at the evidence-closure commit.
-- [ ] hosted CI succeeds on that exact evidence-closure commit.
-- [ ] annotated tag `v1.8.0` created at the verified evidence-closure commit.
-- [ ] tag pushed to `origin`.
-- [ ] remote tag verified.
+- [x] hosted CI succeeded on that exact release-prep commit.
+- [x] evidence-closure commit `8edf0154f80862c283ea20f5f2e9e5fcbca8e734` created and pushed.
+- [x] remote `main` verified at the evidence-closure commit before tagging.
+- [x] hosted CI succeeded on that exact evidence-closure/tag-target commit.
+- [x] annotated tag `v1.8.0` created at `8edf0154f80862c283ea20f5f2e9e5fcbca8e734`.
+- [x] tag pushed to `origin`.
+- [x] remote tag verified.
 
-The evidence-closure commit must contain documentation/status changes only. Its future CI run ID is verified externally and is not embedded by another pre-tag mutation, avoiding an infinite evidence-update loop.
+Remote annotated-tag object:
+
+`47411ee438fdb10745a5bd1fdce1d76067ab4cee`
+
+The annotated tag object points to commit:
+
+`8edf0154f80862c283ea20f5f2e9e5fcbca8e734`
+
+Tag message:
+
+`CodexBar v1.8.0 — Plan`
+
+GitHub reports the tag as unsigned. This is recorded as release metadata, not as a release failure.
+
+The release tag is immutable release evidence. This post-tag documentation synchronization occurs on `main` after the release and does not move or rewrite `v1.8.0`.

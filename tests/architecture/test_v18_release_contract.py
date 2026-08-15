@@ -45,7 +45,7 @@ def test_v18_release_documents_are_present_and_identify_plan() -> None:
 
     changelog = _read("CHANGELOG.md")
     assert changelog.startswith("# Changelog\n\n## 1.8.0")
-    assert "Release candidate **Plan**." in changelog
+    assert "Validated **Plan** release." in changelog
 
 
 def test_v18_traceability_mentions_every_frozen_acceptance_and_invariant() -> None:

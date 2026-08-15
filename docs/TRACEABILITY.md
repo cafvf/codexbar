@@ -82,3 +82,5 @@ It covers diagnostics, health, single-instance ownership, async Context/redeem, 
 The v1.8 release-level matrix is maintained in `docs/TRACEABILITY-v1.8.md`.
 The normative implementation-level AC/INV mapping is maintained in `docs/specs/v1.8/TRACEABILITY.md`.
 It covers checkpoint policy, deterministic factual evaluation, Settings schema v3 compatibility, Settings/CLI configuration, Current Details Plan presentation, factual Plan breach notifications, shared refresh/post-redeem runtime integration and protected authority/regression boundaries.
+
+Release closure is complete as annotated tag `v1.8.0`, targeting commit `8edf0154f80862c283ea20f5f2e9e5fcbca8e734`. Final local, physical and hosted evidence is recorded in the v1.8 release documents.

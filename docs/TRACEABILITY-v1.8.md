@@ -1,11 +1,12 @@
 # CodexBar v1.8 — Release Traceability
 
-Status: release-prep hosted gate green; final evidence-closure/tag sequence pending
+Status: released
 Theme: Plan
-Target release: v1.8.0
+Release: v1.8.0
 Validated baseline: v1.7.0 — Diagnose
+Release tag target: `8edf0154f80862c283ea20f5f2e9e5fcbca8e734`
 
-The normative acceptance-level matrix is `docs/specs/v1.8/TRACEABILITY.md`. This release-level record summarizes the evidence chain used to decide whether v1.8.0 is tag-ready.
+The normative acceptance-level matrix is `docs/specs/v1.8/TRACEABILITY.md`. This release-level record summarizes the evidence chain that closed v1.8.0.
 
 ## Release evidence map
 
@@ -22,7 +23,7 @@ The normative acceptance-level matrix is `docs/specs/v1.8/TRACEABILITY.md`. This
 | Version authority | TASK-864 | `pyproject.toml`, release-neutral version-mode validator | uv-run/editable/uv-tool validation + hosted CI |
 | Desktop contract | TASK-861 | existing native/Qt/single-instance tests | target smoke; no destructive package removal required |
 
-## Pre-release-prep evidence
+## Implementation-completion evidence
 
 The implementation baseline at commit `b8b83abe4fae33ed873e33cb1a3c5462366266dd` passed:
 
@@ -39,8 +40,6 @@ Physical v1.8 behavior on Ubuntu/GNOME/Wayland also passed before the version bu
 - Budget/Plan independence with materially different reserve/checkpoint floors;
 - Plan notification breach, rearm, disabled/no-replay and activation scenarios;
 - released usage-alert LOW/dedupe/disabled/multi-window scenarios.
-
-These are implementation-completion evidence.
 
 ## Final local release-prep evidence
 
@@ -59,8 +58,6 @@ Release-prep commit:
 
 `dd87b4716fe29c5d433704079b729338c42e33c4`
 
-Remote `main` was verified at the same SHA.
-
 GitHub Actions run `31858424480` completed with conclusion **SUCCESS**.
 
 Jobs:
@@ -70,24 +67,45 @@ Jobs:
 - Python 3.14 — SUCCESS;
 - isolated uv-tool version mode — SUCCESS.
 
-The Python jobs each completed pytest, Ruff, strict mypy, compileall, architecture gates and project/editable release-version checks. The uv-tool job completed the isolated release-version validation.
+## Final tag-target evidence
 
-The release-prep hosted blocker is therefore closed.
+Evidence-closure/tag-target commit:
 
-## Remaining tag blockers
+`8edf0154f80862c283ea20f5f2e9e5fcbca8e734`
 
-Only the final evidence-closure/tag sequence remains:
+GitHub Actions run `31858617233` completed with conclusion **SUCCESS**.
 
-- create and push the documentation-only evidence-closure commit;
-- verify remote `main` at that exact commit;
-- require the same hosted CI workflow to succeed on that exact commit;
-- create annotated tag `v1.8.0` only on that verified green commit;
-- push and remotely verify the tag.
+Jobs:
 
-No further code, settings schema, version, lock, Plan behavior or README mutation is required before tagging.
+- Python 3.12 — SUCCESS;
+- Python 3.13 — SUCCESS;
+- Python 3.14 — SUCCESS;
+- isolated uv-tool version mode — SUCCESS.
 
-The future CI run ID of the evidence-closure commit is verified externally rather than embedded through another pre-tag documentation mutation. This keeps the tag target stable and avoids an infinite evidence-update loop.
+The exact tag-target commit therefore passed the full hosted release contract.
+
+## Tag closure
+
+Annotated tag:
+
+`v1.8.0`
+
+Remote tag object:
+
+`47411ee438fdb10745a5bd1fdce1d76067ab4cee`
+
+Target commit:
+
+`8edf0154f80862c283ea20f5f2e9e5fcbca8e734`
+
+Tag message:
+
+`CodexBar v1.8.0 — Plan`
+
+The tag was pushed and remotely verified. GitHub reports it as unsigned; signing was not a release requirement.
 
 ## Exclusions preserved
 
-Release closure does not introduce forecasting, time-to-exhaustion, exhaustion probability, automatic redeem, Plan-specific persistence/concurrency, History/Context Plan authority or reset-credit evidence as Plan authority.
+The released v1.8 scope does not introduce forecasting, time-to-exhaustion, exhaustion probability, automatic redeem, Plan-specific persistence/concurrency, History/Context Plan authority or reset-credit evidence as Plan authority.
+
+Release closure is complete. Post-tag documentation changes on `main` do not alter the immutable v1.8.0 tag.

@@ -1,9 +1,9 @@
 # CodexBar Product Specification
 
-Status: v1.8 implementation complete; release preparation
-Current validated release: v1.7.0 — Diagnose
-Release candidate: v1.8.0 — Plan
-Theme: Plan
+Status: v1.8.0 validated release; v1.9 planning horizon
+Current validated release: v1.8.0 — Plan
+Next roadmap item: v1.9 — Explore
+Current release theme: Plan
 
 ## Purpose
 
@@ -92,21 +92,23 @@ Read-only descriptive analytics, History UI, richer CURRENT details and stabiliz
 13. `pyproject.toml` is the single release-version authority and hosted CI covers Python 3.12, 3.13 and 3.14.
 14. Evidence-gated app-server, prune, WAL and Ayatana changes were evaluated and intentionally retained without speculative migration.
 
-## Release candidate — v1.8 Plan
+### v1.8 — Plan
 
-v1.8 implementation is complete and is in release preparation. It is not a validated release until the final release-prep commit passes the local and hosted gates and the annotated `v1.8.0` tag is created on that exact verified commit.
+Released as `v1.8.0` on 2026-08-14.
 
 Its product question is:
 
 > How does Current compare with the plan I explicitly configured for this window?
 
-The implementation adds explicit per-window time-to-reset checkpoints, composes them with the existing usage reserve, shows a deterministic signed margin/compliance result in Current Details, and optionally notifies on a factual transition into below-plan state.
+The release adds explicit per-window time-to-reset checkpoints, composes them with the existing usage reserve, shows a deterministic signed margin/compliance result in Current Details, and optionally notifies on a factual transition into below-plan state.
 
 Settings schema v3 persists Plan checkpoints and the Plan breach notification opt-in while keeping schema 1 and 2 readable without rewrite-on-load. The existing `UsageReservePolicy` remains the only reserve authority.
 
 Plan uses only Current plus explicit Settings and the observation timestamp. History, Historical Context, consumption-rate inference, forecasting, probability, reset-credit inventory/ledger and automatic reset-credit redemption have no Plan authority.
 
 The release-level evidence and closure state are recorded in `docs/TRACEABILITY-v1.8.md`, `docs/VALIDATION-v1.8.0.md` and `docs/RELEASE-CHECKLIST-v1.8.0.md`.
+
+The annotated tag `v1.8.0` points to commit `8edf0154f80862c283ea20f5f2e9e5fcbca8e734`.
 
 ## Non-functional invariants
 
@@ -129,4 +131,4 @@ The release-level evidence and closure state are recorded in `docs/TRACEABILITY-
 - cloud/remote/account analytics;
 - native packaging beyond the validated uv/XDG workflow.
 
-Maintenance warnings/deprecations remain tracked in `docs/FUTURE-TASKS.md`.
+The next roadmap item is v1.9 — Explore. Maintenance warnings/deprecations remain tracked in `docs/FUTURE-TASKS.md`.

@@ -1,9 +1,10 @@
 # CodexBar v1.8.0 — Validation
 
-Status at evidence capture: release-prep hosted gate green; final tag-target verification required
+Status: released
 Release theme: Plan
 Target desktop: Ubuntu/GNOME/Wayland
-Validation date: 2026-08-14
+Release date: 2026-08-14
+Release tag: `v1.8.0`
 
 ## Implementation-completion automated evidence
 
@@ -88,11 +89,11 @@ The LOW, dedupe, disabled/no-replay and multi-window LOW/EXHAUSTED physical scen
 
 ## Desktop/native evidence
 
-The v1.8 target GUI behaved normally during physical Settings/Plan validation. Qt/Wayland emitted non-fatal text-input diagnostic lines during one close/focus transition; there was no traceback or application crash.
+The v1.8 target GUI behaved normally during physical Settings/Plan validation. Qt/Wayland emitted non-fatal text-input diagnostic lines during close/focus transitions; there was no traceback or application crash.
 
-v1.8 does not replace the released Ayatana-helper/Qt-fallback architecture. Native/Qt fallback and single-instance behavior remain covered by the released regression suites and must remain green in the final full/hosted gates. A destructive removal of distro packages solely to force fallback is not required for release theater.
+v1.8 does not replace the released Ayatana-helper/Qt-fallback architecture. Native/Qt fallback and single-instance behavior remain covered by the released regression suites. A destructive removal of distro packages solely to force fallback was not required.
 
-No real reset credit is required or consumed for v1.8 Plan validation.
+No real reset credit was required or consumed for v1.8 Plan validation.
 
 ## Final local release-prep evidence
 
@@ -132,15 +133,15 @@ The Qt fallback contract remains covered by the complete regression suite. No di
 
 ## README reconciliation
 
-The pre-existing local README expansion was reconstructed exactly from its original Ubuntu/Ayatana/uv-tool transformation and then reconciled with v1.8 Plan documentation. The reconciled release-candidate README preserves the expanded installation/runtime guidance and adds only v1.8-facing changes:
+The pre-existing local README expansion was reconstructed from its original Ubuntu/Ayatana/uv-tool transformation and then reconciled with v1.8 Plan documentation. The released README preserves the expanded installation/runtime guidance and adds v1.8-facing changes:
 
-- release-candidate identity;
+- release identity;
 - Plan capability and Current Details section;
 - Plan Settings controls and schema-v3 compatibility;
 - release-neutral version validation / Plan notification harness examples;
 - v1.8 release-document links.
 
-This closes the README ownership constraint without blind replacement.
+This closed the README ownership constraint without blind replacement.
 
 ## Hosted release-prep CI evidence
 
@@ -154,8 +155,6 @@ GitHub Actions run:
 
 `31858424480` — **SUCCESS**
 
-The run was triggered by the push of the exact release-prep commit and completed successfully.
-
 Hosted jobs:
 
 - Python 3.12 — SUCCESS (job `94947313261`);
@@ -163,18 +162,61 @@ Hosted jobs:
 - Python 3.14 — SUCCESS (job `94947313325`);
 - isolated uv-tool version mode — SUCCESS (job `94947313274`).
 
-Each Python matrix job completed the hosted pytest, Ruff, strict mypy, compileall, architecture-gate and project/editable version-authority steps successfully. The separate uv-tool job completed the release-neutral isolated installation/version check successfully.
+Each Python matrix job completed hosted pytest, Ruff, strict mypy, compileall, architecture-gate and project/editable version-authority steps successfully. The separate uv-tool job completed the release-neutral isolated installation/version check successfully.
 
-This closes the hosted gate for the release-prep commit.
+## Final tag-target CI evidence
 
-## Final tag-target rule
+Evidence-closure/tag-target commit:
 
-The release-prep commit is fully green locally, physically and in hosted CI.
+`8edf0154f80862c283ea20f5f2e9e5fcbca8e734`
 
-This evidence-closure documentation is intended to become the final tag-target commit. The annotated `v1.8.0` tag is authorized only after:
+Remote `main` was verified at that commit before tagging.
 
-1. the evidence-closure commit is created and pushed;
-2. remote `main` is verified at that exact commit;
-3. the same hosted CI workflow succeeds on that exact commit.
+GitHub Actions run:
 
-No additional code, version, lock or behavioral change is required for this closure. The CI result for the evidence-closure commit is intentionally verified externally after the commit exists; the documentation must not be mutated again merely to embed its own future run ID before tagging.
+`31858617233` — **SUCCESS**
+
+Hosted jobs:
+
+- Python 3.12 — SUCCESS (job `94947807995`);
+- Python 3.13 — SUCCESS (job `94947807960`);
+- Python 3.14 — SUCCESS (job `94947807946`);
+- isolated uv-tool version mode — SUCCESS (job `94947807935`).
+
+This exact commit therefore passed the same hosted release contract used for the release-prep commit and became the authorized tag target.
+
+## Annotated tag verification
+
+Remote ref:
+
+`refs/tags/v1.8.0`
+
+Annotated-tag object SHA:
+
+`47411ee438fdb10745a5bd1fdce1d76067ab4cee`
+
+The annotated tag object points to:
+
+`8edf0154f80862c283ea20f5f2e9e5fcbca8e734`
+
+Tag message:
+
+`CodexBar v1.8.0 — Plan`
+
+GitHub tagger timestamp:
+
+`2026-08-15T02:15:46Z`
+
+This corresponds to the 2026-08-14 project-local release date in America/Maceio.
+
+GitHub verification metadata reports `verified: false` with reason `unsigned`. The release process did not require a signed tag, so this is recorded as factual metadata rather than a release blocker.
+
+## Release decision
+
+**RELEASED.**
+
+All required implementation, regression, version-authority, physical desktop, release-prep hosted, final tag-target hosted and remote annotated-tag verification gates are closed.
+
+The immutable `v1.8.0` tag points to the exact green commit `8edf0154f80862c283ea20f5f2e9e5fcbca8e734`.
+
+Any documentation synchronization after tag creation occurs on `main` and does not move or rewrite the released tag.

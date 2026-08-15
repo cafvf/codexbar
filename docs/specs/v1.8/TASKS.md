@@ -1,9 +1,11 @@
 # CodexBar v1.8 — Tasks
 
-Status: Phases A–E complete; Phase F local release preparation complete; hosted/tag closure pending
-Release target: v1.8.0 — Plan
+Status: complete; released as v1.8.0
+Release: v1.8.0 — Plan
 Baseline: v1.7.0 — Diagnose
 Implementation-complete commit: `b8b83abe4fae33ed873e33cb1a3c5462366266dd`
+Release-prep commit: `dd87b4716fe29c5d433704079b729338c42e33c4`
+Release/tag-target commit: `8edf0154f80862c283ea20f5f2e9e5fcbca8e734`
 
 Implementation rule: complete phases in dependency order. Do not start the next phase with a red gate.
 
@@ -25,7 +27,7 @@ Implementation rule: complete phases in dependency order. Do not start the next 
 | C | settings schema/configuration | 830..839 | Complete | v3 compatibility + GUI/CLI configuration green |
 | D | Current Details | 840..849 | Complete | PlanPanel/current presenter green |
 | E | Plan breach alerts | 850..859 | Complete | transition harness + runtime integration green |
-| F | regression + physical + release prep | 860..869 | Local complete | global/physical/docs evidence ready; exact-commit hosted CI/tag closure |
+| F | regression + physical + release prep | 860..869 | Complete | global/physical/docs/hosted/tag closure complete |
 
 Dependencies:
 
@@ -38,7 +40,9 @@ Implementation commits:
 - Phase A: `bfb4933` — coherence baseline;
 - Phase B: `9e18915` — Plan policy and evaluator;
 - Phase C: `5a1a285` — Settings schema v3 and editor;
-- Phases D+E: `b8b83ab` — Plan runtime, UI and alerts.
+- Phases D+E: `b8b83ab` — Plan runtime, UI and alerts;
+- release preparation: `dd87b47`;
+- evidence closure/tag target: `8edf015`.
 
 ## Phase A — Spec and coherence baseline
 
@@ -260,23 +264,34 @@ Status: complete. Plan-specific validation plus final release-prep native/window
 
 Map every REQ/UC/AC/INV to evidence.
 
-Status: completed by `docs/specs/v1.8/TRACEABILITY.md` and `docs/TRACEABILITY-v1.8.md`; final release gate evidence remains pending.
+Status: complete. `docs/specs/v1.8/TRACEABILITY.md` and `docs/TRACEABILITY-v1.8.md` close the implementation and release evidence.
 
 ### TASK-863 — Documentation integration
 
 Update PRODUCT_SPEC, ROADMAP, TRACEABILITY/global docs and README only by reconciling against the user's already modified local README.
 
-Status: complete locally. The pre-existing expanded README was preserved and reconciled with v1.8 Plan user documentation.
+Status: complete. The pre-existing expanded README was preserved, reconciled with v1.8 Plan documentation, and shipped in the v1.8 release lineage.
 
 ### TASK-864 — Version/release preparation
 
 Bump `pyproject.toml`, regenerate lock, validate uv-run/editable/tool modes, hosted CI 3.12/3.13/3.14, physical target evidence, then normal release/tag sequence.
 
-Status: local preparation complete: pyproject/lock 1.8.0, three version modes green, 819-test final gate green, README reconciled, physical smoke green. Exact-commit hosted CI and tag closure remain.
+Status: complete.
+
+Release closure evidence:
+
+- project/lock version: 1.8.0;
+- final local gate: 819 tests plus Ruff/mypy/compileall/diff check;
+- uv-run/editable/uv-tool version modes: green;
+- release-prep CI run `31858424480`: SUCCESS;
+- tag-target CI run `31858617233`: SUCCESS;
+- annotated tag `v1.8.0` remotely verified;
+- tag target: `8edf0154f80862c283ea20f5f2e9e5fcbca8e734`;
+- remote tag object: `47411ee438fdb10745a5bd1fdce1d76067ab4cee`.
 
 ## Deferred maintenance tasks not in v1.8 critical path
 
-Do not mix these into a failing Plan phase:
+These remain separate from the closed v1.8 release:
 
 - unify redeem duplicate enums;
 - rename historical `reset_at`;
@@ -286,4 +301,4 @@ Do not mix these into a failing Plan phase:
 - clean tracked `.omx` runtime artifacts;
 - remove accidental empty `:1:1` files.
 
-The last two are suitable for a separate CHORE commit before/after functional work, but they are not Plan acceptance gates.
+The last two remain suitable for a separate CHORE commit and were not Plan acceptance gates.

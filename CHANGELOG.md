@@ -2,7 +2,7 @@
 
 ## 1.8.0 — 2026-08-14
 
-Release candidate **Plan**.
+Validated **Plan** release.
 
 ### Added
 - explicit per-window Plan checkpoints keyed by opaque `UsageWindowId` and whole-second time-to-reset coordinates;
@@ -28,7 +28,7 @@ Release candidate **Plan**.
 - refresh and authoritative post-redeem `adopt_snapshot()` converge through the same Plan evaluation/alert path;
 - no Plan-specific persistence, worker, scheduler, cache or revision subsystem is introduced.
 
-### Validation to date
+### Validation
 - implementation-completion gate: 815 tests passed; Ruff, strict mypy, compileall and `git diff --check` passed;
 - final post-bump release-prep gate: 819 tests passed; Ruff, strict mypy, compileall and `git diff --check` passed;
 - uv-run, editable and isolated uv-tool version modes all report metadata/runtime 1.8.0;
@@ -36,9 +36,12 @@ Release candidate **Plan**.
 - PlanPanel placement, live Settings application, 30d checkpoint rendering and Budget-vs-Plan independence physically validated;
 - Plan breach/rearm/disabled/activation notification scenarios passed using the existing desktop-notification harness;
 - released LOW/dedupe/disabled/multi-window notification scenarios remained green;
-- final native/window lifecycle release-candidate smoke passed; Qt/Wayland text-input diagnostics were non-fatal.
+- final native/window lifecycle release-candidate smoke passed; Qt/Wayland text-input diagnostics were non-fatal;
+- release-prep CI run `31858424480` succeeded on exact commit `dd87b4716fe29c5d433704079b729338c42e33c4`;
+- final tag-target CI run `31858617233` succeeded on exact commit `8edf0154f80862c283ea20f5f2e9e5fcbca8e734`;
+- annotated tag `v1.8.0` was remotely verified and points to `8edf0154f80862c283ea20f5f2e9e5fcbca8e734`.
 
-Final release-prep local/hosted gates and tag evidence are recorded in `docs/VALIDATION-v1.8.0.md` and `docs/RELEASE-CHECKLIST-v1.8.0.md`.
+Final local/hosted gates and tag evidence are recorded in `docs/VALIDATION-v1.8.0.md` and `docs/RELEASE-CHECKLIST-v1.8.0.md`.
 
 ## 1.7.0 — 2026-08-14
 

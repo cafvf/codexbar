@@ -39,7 +39,7 @@ Release type: **production-readiness maintenance / bugfix**
 ## Release closure
 
 - [ ] release commit pushed;
-- [ ] annotated `v1.8.1` tag created on the validated commit;
-- [ ] remote tag target verified;
-- [ ] GitHub Release published;
+- [x] annotated `v1.8.1` tag created on validated commit `b040bbd40febeaa6e90dd13a9b3e74661a40d76a`;
+- [x] remote tag target verified: annotated tag object `96f781a3487ba9d8d241e59a57a5fb7df2245b8d` points to `b040bbd40febeaa6e90dd13a9b3e74661a40d76a`;
+- [x] GitHub Release `CodexBar 1.8.1` published for tag `v1.8.1`;
 - [ ] `docs/PRODUCTION-READINESS.md` records Phase D complete.

@@ -67,7 +67,7 @@ jobs:
       - name: Version authority in project and editable modes
         run: >
           uv run --python "${UV_PYTHON}" python
-          scripts/validate_v17_version_modes.py --skip-tool
+          scripts/validate_release_version_modes.py --skip-tool
 
   version-tool-mode:
     name: uv tool version mode
@@ -89,4 +89,4 @@ jobs:
       - name: Validate uv run, editable and isolated uv tool modes
         run: >
           uv run --python "${UV_PYTHON}" python
-          scripts/validate_v17_version_modes.py
+          scripts/validate_release_version_modes.py

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 
@@ -38,14 +39,14 @@ def test_phase_h_characterizer_reads_phase_d_top_level_metric_shape() -> None:
     assert "--phase-a-attempts" in source
 
 
-def test_phase_h_release_version_uses_single_authority() -> None:
-    project = Path("pyproject.toml").read_text(encoding="utf-8")
+def test_phase_h_release_evidence_preserves_single_authority_decision() -> None:
     runtime = Path("src/codexbar/__init__.py").read_text(encoding="utf-8")
     evidence = Path(
         "docs/specs/v1.7/evidence/PHASE-H-VALIDATION-RELEASE.md"
     ).read_text(encoding="utf-8")
 
-    assert 'version = "1.7.0"' in project
     assert 'distribution_version("codexbar")' in runtime
-    assert '__version__ = "1.7.0"' not in runtime
+    assert re.search(r'__version__\s*=\s*"\d+\.\d+\.\d+"', runtime) is None
     assert "H2 — release preparation" in evidence
+    assert "`pyproject.toml` is `1.7.0`;" in evidence
+    assert "`uv.lock` contains CodexBar `1.7.0`;" in evidence

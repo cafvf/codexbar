@@ -1,10 +1,10 @@
 # CodexBar v1.8 — Test strategy and matrix
 
-Status: frozen for implementation
+Status: implementation complete; release preparation
 
 ## 1. Harness objective
 
-The v1.8 test plan MUST extend the existing harness rather than replace it.
+The v1.8 test plan extends the existing harness rather than replacing it.
 
 The principal rule is:
 
@@ -12,9 +12,7 @@ The principal rule is:
 
 Existing v1.0–v1.7 tests remain the regression baseline.
 
-## 2. Planned new automated test groups
-
-Keep the new-file count small.
+## 2. Implemented automated test groups
 
 ### Pure/domain/application
 
@@ -28,9 +26,8 @@ Covers:
 - effective floor;
 - signed margin;
 - compliance;
-- partial/no-policy resolution.
-
-Use parameterized canonical vectors instead of one test per branch.
+- partial/no-policy resolution;
+- canonical P01..P14 vectors.
 
 `tests/unit/test_plan_alerts.py`
 
@@ -46,7 +43,9 @@ Covers transition state machine:
 - policy rebaseline;
 - cycle rebaseline;
 - reset missing/invalid eligibility;
-- multi-window isolation.
+- multi-window isolation;
+- delivery-failure isolation;
+- canonical A01..A10 semantics.
 
 ### Settings
 
@@ -55,17 +54,15 @@ Covers transition state machine:
 Covers:
 
 - schema 3 canonical round-trip;
-- v1/v2 read without rewrite (parameterized);
+- v1/v2 read without rewrite;
 - explicit legacy save -> v3;
 - invalid v3 shape/duplicates/types.
 
-Do not copy all existing schema-v1/v2 tests.
-
 `tests/unit/test_plan_settings_ui.py`
 
-Covers only Plan-specific UI/model behavior:
+Covers Plan-specific UI/model behavior:
 
-- current-window checkpoint edit;
+- current-window checkpoint editing;
 - absent-window policy preservation;
 - Save/Cancel/Reset;
 - Plan notification checkbox.
@@ -74,102 +71,69 @@ Existing generic Settings tests remain authoritative for the rest.
 
 ### Current Details
 
-`tests/unit/test_plan_panel.py`
+`tests/unit/test_plan_panel_text.py`
 
-Covers compact render states:
+Covers compact semantic render states and duration presentation without fragile full-layout snapshots.
 
-- not configured;
-- active/checkpoint-dominant;
-- reserve-dominant;
-- no active checkpoint;
-- reset unavailable;
-- stale.
+`tests/gui/test_plan_panel.py`
 
-Use semantic text assertions, not fragile full-layout snapshots.
+Covers the Qt PlanPanel surface, ordering/content and STALE/current presentation behavior.
+
+`tests/unit/test_plan_current_presentation.py`
+
+Covers Plan derivation from the captured Current observation, settings application and STALE withholding.
+
+### Runtime/alerts integration
+
+`tests/unit/test_plan_alert_runtime_controller.py`
+
+Covers normal refresh and authoritative `adopt_snapshot()` convergence through the same Plan alert path.
+
+`tests/unit/test_plan_alert_validation_harness.py`
+
+Protects the Plan scenarios added to the existing physical notification harness.
 
 ### Architecture
 
 `tests/architecture/test_v18_plan_architecture.py`
 
-Protect:
+Protects:
 
 - no History/Context authority imports in Plan;
 - no Plan persistence/concurrency subsystem;
 - no Plan-to-redeem path;
 - Budget does not import Plan;
 - Plan does not parse `UsageWindowId`;
-- shared neutral quantity ownership where appropriate.
+- shared neutral quantity ownership;
+- one runtime integration seam for Plan processing.
 
-Use AST/import checks consistent with existing architecture harness style.
+`tests/architecture/test_v18_release_contract.py`
 
-### Integration/acceptance
+Protects release-prep version/document/CI coherence without asserting that the release tag already exists.
 
-`tests/acceptance/test_v18_plan_runtime.py` or the existing equivalent acceptance location.
-
-Covers:
-
-- normal refresh -> Plan evaluation/alerts;
-- post-redeem `adopt_snapshot()` -> same Plan alert path;
-- live settings update affects next evaluation without restart;
-- no extra source read.
-
-If existing test files already provide the same harness seam, extend them rather than add this file.
-
-## 3. Existing tests to extend, not duplicate
+## 3. Existing tests extended, not duplicated
 
 ### `tests/unit/test_redeem_process_manager.py`
 
-Add one vector:
-
-- terminal successful consume + `UsageSchemaError` refetch -> success retained and `refetch_error` populated.
-
-This closes existing `AC-REDEEM-019`.
+Covers terminal successful consume + expected `UsageError` refetch failure: success is retained and `refetch_error` populated.
 
 ### app-server parser tests
 
-Add one source vector:
-
-- primary/secondary normalize to duplicate `UsageWindowId` -> typed `UsageSchemaError`.
+Cover duplicate normalized `UsageWindowId` as typed `UsageSchemaError`.
 
 ### `tests/unit/test_current_account_viewmodel.py`
 
-Add:
-
-- non-default LOW threshold is honored by presenter once it stores AppSettings;
-- Plan is derived from the captured observation without second read.
+Protects captured-observation reuse and released Current presentation behavior.
 
 ### `tests/unit/test_cli.py`
 
-Extend Settings show expectations for:
+Extends Settings show expectations for Plan opt-in/checkpoints/schema source.
 
-- Plan opt-in;
-- checkpoint rendering;
-- schema source.
+### `scripts/validate_alerts.py`
 
-### `scripts/validate_alerts.py` + `test_alert_validation_harness.py`
-
-Keep all existing usage-alert scenarios unchanged.
-
-Add a small Plan scenario namespace, for example:
-
-```text
-plan-baseline
-plan-breach
-plan-dedupe
-plan-rearm
-plan-disabled
-plan-checkpoint
-plan-cycle
-plan-policy
-```
-
-The physical harness should use the same notifier transport.
-
-Avoid creating a second near-duplicate physical notification script.
+The released usage-alert scenarios remain unchanged. Plan adds focused breach/rearm/disabled/activation scenarios using the same notifier transport rather than a second physical notification script.
 
 ## 4. Canonical Plan vectors
-
-Use one table-driven pure evaluator suite.
 
 | Vector | Reserve | Checkpoints | ttr/reset | Remaining | Expected |
 |---|---:|---|---|---:|---|
@@ -306,8 +270,7 @@ Typed document/validation failure.
 
 ### S07 — invalid seconds
 
-Reject negative, bool and non-integer persisted values. Domain checkpoint construction also rejects
-sub-second coordinates so encode/decode cannot lose precision.
+Reject negative, bool and non-integer persisted values. Domain checkpoint construction also rejects sub-second coordinates so encode/decode cannot lose precision.
 
 ### S08 — invalid minimum
 
@@ -315,20 +278,18 @@ Reuse Fraction/Decimal-string rejection.
 
 ## 7. Architecture invariants
 
-Prefer a handful of robust AST/import assertions over dozens of source-string tests.
-
-Minimum:
-
 - `INV-PLAN-001`: Plan core imports no History/Context authority.
 - `INV-PLAN-002`: no Plan persistence class/path.
 - `INV-PLAN-003`: Plan core imports no concurrency/timer facilities.
 - `INV-PLAN-004`: Plan alerts import no redeem/consume path.
 - `INV-PLAN-005/006`: reserve owner and Budget independence.
-- `INV-PLAN-007`: no duration parsing from `UsageWindowId` in Plan core.
+- `INV-PLAN-007`: no duration/product parsing from `UsageWindowId` in Plan core.
+
+All are mapped in `docs/specs/v1.8/TRACEABILITY.md`.
 
 ## 8. Mandatory existing regression families
 
-Remain green:
+Remain release-blocking:
 
 - app-server source fixtures;
 - refresh/current STALE and fail-closed behavior;
@@ -349,28 +310,32 @@ Remain green:
 - CLI;
 - hosted Python 3.12/3.13/3.14 CI contract.
 
+The pre-release-prep v1.8 implementation baseline passed 815 tests. The final post-bump suite remains mandatory.
+
 ## 9. Physical target validation
 
-Required on target Ubuntu/GNOME/Wayland:
+Completed on target Ubuntu/GNOME/Wayland:
 
-1. open Settings from native/fallback menu;
-2. add/edit/remove Plan checkpoints for current windows;
-3. Save and reopen; values persist;
-4. Cancel leaves values unchanged;
-5. PlanPanel renders configured/no-active/active states using mock/current data;
+1. Settings opened and Plan checkpoint editor exercised;
+2. add/edit/remove checkpoints;
+3. Save/reopen persistence;
+4. Cancel and Reset behavior;
+5. PlanPanel active/configured behavior;
 6. live Settings Save updates Plan without restart;
-7. run existing usage-alert physical scenarios;
-8. run Plan breach/rearm/disabled physical scenarios;
-9. Open Details close/reopen remains stable;
-10. native indicator remains usage-focused;
-11. no duplicate GUI owner;
-12. no real reset credit is required.
+7. released usage-alert physical scenarios;
+8. Plan breach/rearm/disabled/activation scenarios;
+9. Current Details remained visually stable through the tested lifecycle;
+10. native indicator remained usage-focused during Plan validation;
+11. no duplicate-owner regression was observed in the Plan workflow;
+12. no real reset credit was required.
+
+Release-prep still requires a concise final native/window lifecycle smoke. Qt fallback remains protected by automated/released evidence; do not remove system packages merely to manufacture a physical fallback event.
 
 Real redeem remains optional because it is destructive/consumes a real credit; mock post-redeem adoption is sufficient for v1.8 Plan integration.
 
 ## 10. Full gate
 
-Before phase completion:
+Before release-prep commit:
 
 ```bash
 uv run ruff check src tests scripts --fix
@@ -380,5 +345,14 @@ uv run mypy
 uv run python -m compileall -q src scripts
 git diff --check
 ```
+
+After the version bump also run:
+
+```bash
+uv lock
+uv run python scripts/validate_release_version_modes.py
+```
+
+The final exact release-prep commit must then pass hosted Python 3.12/3.13/3.14 quality jobs and the isolated uv-tool version-mode job before tag creation.
 
 A new dependency is not justified by the v1.8 test plan.

@@ -1,8 +1,8 @@
 # CodexBar Product Specification
 
-Status: v1.8 specification frozen for implementation
+Status: v1.8 implementation complete; release preparation
 Current validated release: v1.7.0 — Diagnose
-Active specification: v1.8 — Plan
+Release candidate: v1.8.0 — Plan
 Theme: Plan
 
 ## Purpose
@@ -24,6 +24,9 @@ CodexBar reports what a verified Codex source exposes. Historical data are discr
 - **Reset-credit inventory:** current authoritative count plus optional per-credit detail.
 - **Reset event ledger:** append-only evidence of observed reset-credit changes and redeem attempts/outcomes.
 - **Usage reserve:** user policy keyed by `UsageWindowId`.
+- **Plan checkpoint:** explicit whole-second time-to-reset coordinate plus minimum remaining fraction.
+- **Plan effective floor:** maximum of the configured usage reserve and active checkpoint minimum among factually available components.
+- **Plan margin:** signed `remaining - effective_floor` difference.
 - **Usable headroom:** `max(remaining - reserve, 0)`.
 - **Redeem attempt:** durable destructive operation identified by an idempotency key.
 - **OUTCOME_UNKNOWN:** consume may have reached the source but the client cannot safely infer the result.
@@ -89,21 +92,21 @@ Read-only descriptive analytics, History UI, richer CURRENT details and stabiliz
 13. `pyproject.toml` is the single release-version authority and hosted CI covers Python 3.12, 3.13 and 3.14.
 14. Evidence-gated app-server, prune, WAL and Ayatana changes were evaluated and intentionally retained without speculative migration.
 
-## Active specification — v1.8 Plan
+## Release candidate — v1.8 Plan
 
-v1.8 is frozen for implementation but is not yet a validated release.
+v1.8 implementation is complete and is in release preparation. It is not a validated release until the final release-prep commit passes the local and hosted gates and the annotated `v1.8.0` tag is created on that exact verified commit.
 
 Its product question is:
 
 > How does Current compare with the plan I explicitly configured for this window?
 
-The frozen scope adds explicit per-window time-to-reset checkpoints, composes them with the existing
-usage reserve, shows a deterministic signed margin/compliance result in Current Details, and optionally
-notifies on a factual transition into below-plan state.
+The implementation adds explicit per-window time-to-reset checkpoints, composes them with the existing usage reserve, shows a deterministic signed margin/compliance result in Current Details, and optionally notifies on a factual transition into below-plan state.
 
-Plan uses only Current plus explicit Settings and the observation timestamp. History, Historical Context,
-consumption-rate inference, forecasting, probability and automatic reset-credit redemption have no Plan
-authority.
+Settings schema v3 persists Plan checkpoints and the Plan breach notification opt-in while keeping schema 1 and 2 readable without rewrite-on-load. The existing `UsageReservePolicy` remains the only reserve authority.
+
+Plan uses only Current plus explicit Settings and the observation timestamp. History, Historical Context, consumption-rate inference, forecasting, probability, reset-credit inventory/ledger and automatic reset-credit redemption have no Plan authority.
+
+The release-level evidence and closure state are recorded in `docs/TRACEABILITY-v1.8.md`, `docs/VALIDATION-v1.8.0.md` and `docs/RELEASE-CHECKLIST-v1.8.0.md`.
 
 ## Non-functional invariants
 

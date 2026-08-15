@@ -29,11 +29,8 @@
 | REQ-UI-002 | AC-UI-009..015 | `ui.viewmodel`, Qt tray | `test_req_ui_002.py`, GUI smoke | target Qt path validated |
 | REQ-UI-002 | AC-UI-016..019 | `ui.native_indicator`, `ui.tray` | `test_native_indicator.py`, `test_req_ui_002.py` | validated on target Linux |
 | REQ-UI-002 | AC-UI-020..024 | `ui.native_indicator`, `ui.native_indicator_helper`, ADR-003 | `test_native_indicator.py`, architecture tests | validated on target Linux |
-
 | REQ-UI-002 / UC-UI-007 | AC-UI-027..031 | `run_indicator_diagnostics`, helper `--diagnose`, CLI `--diagnose-indicator` | `tests/unit/test_native_indicator.py` | TASK-029E/F | ADR-003 |
-
 | REQ-UI-002 / UC-UI-007 | AC-UI-032..033 | `sanitized_native_environment`, all system-Python launch sites | `tests/unit/test_native_indicator.py` sanitizer/launch regression tests | TASK-029G | ADR-003 |
-
 
 ## REQ-UI-002 supervision, diagnostics and environment isolation
 
@@ -44,7 +41,6 @@
 | REQ-UI-002 | AC-UI-032..033 | sanitized helper launcher environment | native environment sanitization tests | validated on target VS Code/Snap-contaminated launch path |
 
 Target evidence and limitations are recorded in `docs/VALIDATION.md`.
-
 
 ## REQ-DESKTOP-001 distribution and XDG integration
 
@@ -62,10 +58,10 @@ Target evidence and limitations are recorded in `docs/VALIDATION.md`.
 | REQ-DESKTOP-001 | AC-DESKTOP-014 | `desktop._xdg_data_home`, `desktop._xdg_config_home` | desktop acceptance/unit Snap-XDG regression tests | validated |
 | REQ-DESKTOP-001 | AC-DESKTOP-015 | `scripts/install.sh`, `scripts/uninstall.sh` | installer policy unit test | validated |
 | REQ-DESKTOP-001 | AC-DESKTOP-016 | `scripts/install.sh` legacy-install notice | installer policy review + target observation | validated |
+
 ## v1.1 — REQ-SETTINGS-001
 
-The detailed settings traceability matrix is maintained in
-`docs/TRACEABILITY-REQ-SETTINGS-001.md`.
+The detailed settings traceability matrix is maintained in `docs/TRACEABILITY-REQ-SETTINGS-001.md`.
 
 | Requirement | Criteria | Primary implementation | Primary evidence | Status |
 |---|---|---|---|---|
@@ -79,6 +75,10 @@ ADR-005 records the schema-v1 persistence compatibility boundary. The v1.1 relea
 ## v1.7 — Diagnose
 
 The v1.7 release-level matrix is maintained in `docs/TRACEABILITY-v1.7.md`.
-It covers diagnostics, health, single-instance ownership, async Context/redeem,
-account lineage, source compatibility, Budget clarification, native hardening,
-version/CI, performance and evidence-gated maintenance.
+It covers diagnostics, health, single-instance ownership, async Context/redeem, account lineage, source compatibility, Budget clarification, native hardening, version/CI, performance and evidence-gated maintenance.
+
+## v1.8 — Plan
+
+The v1.8 release-level matrix is maintained in `docs/TRACEABILITY-v1.8.md`.
+The normative implementation-level AC/INV mapping is maintained in `docs/specs/v1.8/TRACEABILITY.md`.
+It covers checkpoint policy, deterministic factual evaluation, Settings schema v3 compatibility, Settings/CLI configuration, Current Details Plan presentation, factual Plan breach notifications, shared refresh/post-redeem runtime integration and protected authority/regression boundaries.

@@ -1,5 +1,45 @@
 # Changelog
 
+## 1.8.0 — 2026-08-14
+
+Release candidate **Plan**.
+
+### Added
+- explicit per-window Plan checkpoints keyed by opaque `UsageWindowId` and whole-second time-to-reset coordinates;
+- deterministic Plan evaluation with active checkpoint resolution, effective floor, signed margin and ABOVE/AT/BELOW compliance;
+- Settings schema v3 with checkpoint persistence and an explicit Plan breach-notification opt-in;
+- typed Plan checkpoint editor and CLI inspection while preserving currently absent window policies;
+- Current Details Plan panel derived from the same captured Current observation as existing Current surfaces;
+- factual CURRENT-only Plan breach notifications with silent baselines, dedupe, recovery/rearm, policy/cycle rebaseline and delivery-failure isolation;
+- Plan alert physical-validation scenarios integrated into the existing notification harness.
+
+### Changed
+- explicit Settings saves now write canonical schema 3; schema 1 and 2 remain readable without rewrite-on-load;
+- Current presentation honors the configured LOW threshold while Plan remains a separate deterministic policy comparison;
+- release version advances to 1.8.0 with `pyproject.toml` remaining the sole version authority;
+- hosted version-mode validation uses the release-neutral `scripts/validate_release_version_modes.py` entry point.
+
+### Compatibility and safety
+- `UsageReservePolicy` remains the sole configured reserve owner and Budget remains Plan-independent;
+- History, Historical Context, reset ledger and reset-credit inventory have no Plan authority;
+- STALE data is not presented or notified as current Plan compliance;
+- existing LOW/EXHAUSTED alert semantics remain unchanged;
+- no forecast, time-to-exhaustion estimate, exhaustion probability or automatic redeem is introduced;
+- refresh and authoritative post-redeem `adopt_snapshot()` converge through the same Plan evaluation/alert path;
+- no Plan-specific persistence, worker, scheduler, cache or revision subsystem is introduced.
+
+### Validation to date
+- implementation-completion gate: 815 tests passed; Ruff, strict mypy, compileall and `git diff --check` passed;
+- final post-bump release-prep gate: 819 tests passed; Ruff, strict mypy, compileall and `git diff --check` passed;
+- uv-run, editable and isolated uv-tool version modes all report metadata/runtime 1.8.0;
+- Settings add/edit/remove/Save/Cancel/Reset behavior physically validated on Ubuntu/GNOME/Wayland;
+- PlanPanel placement, live Settings application, 30d checkpoint rendering and Budget-vs-Plan independence physically validated;
+- Plan breach/rearm/disabled/activation notification scenarios passed using the existing desktop-notification harness;
+- released LOW/dedupe/disabled/multi-window notification scenarios remained green;
+- final native/window lifecycle release-candidate smoke passed; Qt/Wayland text-input diagnostics were non-fatal.
+
+Final release-prep local/hosted gates and tag evidence are recorded in `docs/VALIDATION-v1.8.0.md` and `docs/RELEASE-CHECKLIST-v1.8.0.md`.
+
 ## 1.7.0 — 2026-08-14
 
 Release candidate **Diagnose**.

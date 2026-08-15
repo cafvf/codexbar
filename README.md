@@ -2,7 +2,8 @@
 
 CodexBar is a Linux tray application for monitoring Codex usage, retaining bounded observational history, and exposing explicit reset-credit control when the local Codex app-server provides that capability.
 
-Current release: **1.7.0 — Diagnose**.
+Current validated release: **1.7.0 — Diagnose**.
+Release candidate: **1.8.0 — Plan**.
 
 ## What CodexBar does
 
@@ -13,6 +14,7 @@ The application currently provides:
 - current Codex usage and CURRENT/STALE fallback;
 - desktop tray integration on Linux, with native Ayatana support and Qt fallback;
 - configurable LOW threshold, refresh interval, notifications, and per-window usage reserves;
+- explicit per-window Plan checkpoints plus optional factual Plan-breach notifications;
 - bounded 180-day local usage history with 24h/7d/30d descriptive analysis;
 - empirical Historical context at the current time-to-reset using independent prior cycles;
 - reset-credit count/details when reported by the app-server;
@@ -24,49 +26,167 @@ CodexBar does **not** forecast consumption, estimate authoritative token use, or
 
 ## Requirements
 
-Required:
+CodexBar is designed for Linux. For an Ubuntu installation you need:
 
-- Linux;
-- a locally authenticated Codex installation;
-- a Python version supported by `pyproject.toml`;
-- `uv`;
-- `notify-send`.
+- a locally installed and authenticated Codex CLI/app-server;
+- Python `>=3.12,<3.15`, as declared by `pyproject.toml`;
+- `uv` available on `PATH`;
+- `notify-send` for desktop notifications;
+- PySide6, installed automatically by the CodexBar installation script.
 
-On Ubuntu/Debian:
+Install the Ubuntu system packages used by notifications and the recommended
+native Ayatana tray backend:
 
 ```bash
 sudo apt update
-sudo apt install libnotify-bin
+sudo apt install -y \
+  libnotify-bin \
+  python3-gi \
+  gir1.2-ayatanaappindicator3-0.1 \
+  gir1.2-gtk-3.0
 ```
 
-For native Ayatana tray support:
+The Ayatana packages are optional but recommended on Ubuntu/GNOME. If the native
+indicator is unavailable or becomes unhealthy, CodexBar can use its Qt tray
+fallback. PyGObject intentionally remains provided by the system Python rather
+than the uv-managed application environment.
+
+Check the main prerequisites before installing:
 
 ```bash
-sudo apt install python3-gi gir1.2-ayatanaappindicator3-0.1 gir1.2-gtk-3.0
+uv --version
+codex --version
+notify-send --version
 ```
 
-PyGObject intentionally remains outside the uv-managed environment.
+## Installing CodexBar on Ubuntu
 
-## Installation
+CodexBar uses a **user-local `uv tool` installation**. Do not use `sudo pip`,
+`sudo uv`, or install the Python package into the system interpreter.
 
-Clone the repository and install CodexBar:
+### 1. Obtain the source
+
+For the current development branch:
 
 ```bash
 git clone https://github.com/cafvf/codexbar.git
 cd codexbar
+```
+
+For a released version, select its tag before installing. For example, once
+v1.7.0 is released:
+
+```bash
+git fetch --tags
+git checkout v1.7.0
+```
+
+### 2. Install the application
+
+Run the project installer from the repository root:
+
+```bash
 ./scripts/install.sh
 ```
 
-Check the desktop integration:
+The installer:
 
-```bash
-"$(uv tool dir --bin)/codexbar" desktop status
+- installs CodexBar as a `uv tool`;
+- installs the PySide6 GUI dependency;
+- uses canonical user-local locations under `~/.local` and `~/.config`;
+- installs the CodexBar desktop entry and application icon;
+- leaves autostart disabled until explicitly enabled.
+
+No `sudo` is required for this step.
+
+The command-line launcher is normally installed as:
+
+```text
+~/.local/bin/codexbar
 ```
 
-Run the GUI:
+If `~/.local/bin` is not already on your `PATH`, either add it to your shell
+configuration or invoke CodexBar through `uv tool dir --bin`, as shown below.
+
+### 3. Verify the installation
+
+```bash
+CODEXBAR="$(uv tool dir --bin)/codexbar"
+
+"$CODEXBAR" desktop status
+"$CODEXBAR" doctor
+"$CODEXBAR" --diagnose-indicator
+```
+
+`desktop status` should report the launcher, desktop entry, and icon as installed.
+`doctor` provides the broader CodexBar health report. `--diagnose-indicator`
+checks the optional native Ayatana path; physical rendering still requires
+launching the GUI in the desktop session.
+
+### 4. Start CodexBar
+
+From a terminal:
 
 ```bash
 "$(uv tool dir --bin)/codexbar" --gui
+```
+
+After `desktop install`, CodexBar can also be launched from the Ubuntu/GNOME
+application menu.
+
+Normal installation starts only one GUI owner per user/session. Starting
+`codexbar --gui` again asks the existing instance to show its UI instead of
+creating a second polling runtime.
+
+### 5. Enable autostart (optional)
+
+Autostart is intentionally opt-in:
+
+```bash
+"$(uv tool dir --bin)/codexbar" desktop autostart enable
+```
+
+Disable it again with:
+
+```bash
+"$(uv tool dir --bin)/codexbar" desktop autostart disable
+```
+
+### Updating an installed copy
+
+Update the source checkout to the desired release and rerun the installer:
+
+```bash
+cd /path/to/codexbar
+git fetch --tags
+git checkout <release-tag>
+./scripts/install.sh
+```
+
+The installer uses `uv tool install --force`, so it replaces the installed
+application code while preserving normal user data such as settings, usage
+history, and the reset event ledger.
+
+### Uninstalling
+
+With the source checkout available:
+
+```bash
+./scripts/uninstall.sh
+```
+
+Or remove the desktop integration and tool explicitly:
+
+```bash
+"$(uv tool dir --bin)/codexbar" desktop uninstall
+uv tool uninstall codexbar
+```
+
+Application uninstall does not silently delete persistent user data. Clear
+History explicitly first if you also want to remove retained usage observations:
+
+```bash
+"$(uv tool dir --bin)/codexbar" history clear
 ```
 
 ## Daily use
@@ -77,7 +197,7 @@ The tray remains usage-focused. It exposes the current usage state and opens the
 
 ### Open Details
 
-Open Details contains four conceptual areas.
+Open Details contains five conceptual areas.
 
 #### Current usage
 
@@ -125,6 +245,40 @@ Weekly
 A reserve may be configured even when the current remaining quota is 0%. It becomes relevant after the quota resets.
 
 Reserve configuration is tied to the usage windows currently reported by the source. CodexBar does not hard-code a 5-hour window or any other fixed quota window.
+
+#### Plan
+
+Plan compares the captured **Current** observation with explicit operating targets
+configured by the user for each reported usage window. A checkpoint contains a
+time-to-reset coordinate and a minimum remaining fraction. The applicable Plan
+floor is the maximum of the existing reserve and the currently active checkpoint
+floor.
+
+For CURRENT data, the Plan panel can show:
+
+- whether Plan is configured for the window;
+- whether a checkpoint is active;
+- reset-unavailable/invalid checkpoint capability states;
+- the effective floor and whether reserve, checkpoint, or both determine it;
+- signed margin in percentage points;
+- ABOVE / AT / BELOW compliance.
+
+Example:
+
+```text
+Weekly
+  Current: 63%
+  Active checkpoint: 72h -> minimum 55%
+  Effective floor: 55% (checkpoint)
+  Margin: +8 pp
+  Status: On plan
+```
+
+Plan is deterministic and factual. It uses the same captured Current observation
+and explicit Settings only. History, Historical Context, reset-credit inventory,
+consumption-rate inference, forecasting, exhaustion probability, and automatic
+redeem have no Plan authority. STALE data is not presented as current Plan
+compliance.
 
 #### Reset recommendation
 
@@ -184,7 +338,9 @@ The Settings window currently controls:
 - LOW remaining threshold;
 - automatic refresh interval;
 - desktop notification enablement;
-- per-window usage reserves for usage windows currently reported by Codex.
+- per-window usage reserves for usage windows currently reported by Codex;
+- per-window Plan checkpoints for currently reported usage windows;
+- explicit Plan breach-notification opt-in.
 
 CLI inspection/reset:
 
@@ -193,7 +349,7 @@ codexbar settings show
 codexbar settings reset
 ```
 
-Settings schema v2 stores usage reserves. Existing schema-v1 settings remain readable and are migrated in memory; simply reading an old settings file does not rewrite it.
+Settings schema v3 stores usage reserves, Plan checkpoints, and the Plan breach-notification opt-in. Existing schema-v1 and schema-v2 settings remain readable; simply reading a legacy settings file does not rewrite it. The next explicit valid Save writes canonical schema v3.
 
 ## Reset ledger and redeem safety
 
@@ -235,10 +391,18 @@ uv run python -m compileall -q src scripts
 git diff --check
 ```
 
-v1.7 read-only target validation:
+Release-version authority validation:
 
 ```bash
-uv run python scripts/validate_v17_phase_h.py
+uv run python scripts/validate_release_version_modes.py
+```
+
+Plan notification validation scenarios are available through the existing
+notification harness, for example:
+
+```bash
+uv run python scripts/validate_alerts.py plan-breach --delay 1
+uv run python scripts/validate_alerts.py plan-rearm --delay 1
 ```
 
 Machine-readable Doctor:
@@ -255,7 +419,7 @@ CodexBar maintains independent local persistence responsibilities:
 
 - usage history: schema-v1 SQLite, CURRENT-only observational history;
 - reset event ledger: append-only reset/redeem evidence;
-- application settings: schema v2 JSON with backward-readable schema v1.
+- application settings: schema v3 JSON with backward-readable schemas v1 and v2.
 
 No persistence store is allowed to fabricate or replace current authoritative account state.
 
@@ -263,6 +427,10 @@ No persistence store is allowed to fabricate or replace current authoritative ac
 
 Release-specific documents:
 
+- `docs/specs/v1.8/` — frozen v1.8 Plan requirements, tasks, architecture, and test matrix;
+- `docs/TRACEABILITY-v1.8.md` — v1.8 release traceability;
+- `docs/VALIDATION-v1.8.0.md` — v1.8 target/release evidence;
+- `docs/RELEASE-CHECKLIST-v1.8.0.md` — v1.8 release/tag checklist;
 - `docs/specs/v1.7/` — frozen v1.7 Diagnose requirements, tasks and architecture;
 - `docs/TRACEABILITY-v1.7.md` — v1.7 release traceability;
 - `docs/VALIDATION-v1.7.0.md` — v1.7 target/release evidence;

@@ -1,6 +1,6 @@
 # CodexBar Production Readiness
 
-Status: **Phases A, B and C complete; Phase D in progress**
+Status: **Phases A, B, C and D complete**
 
 Audited baseline: `c24639e811bd0507020e3fb6b4757f2849e6ae0c`
 Validated product release: **v1.8.0 — Plan**
@@ -94,7 +94,7 @@ schema expansion resulted from Phase C.
 
 ## Phase D — Maintenance Release
 
-In progress.
+Complete.
 
 Phase C produced one concrete production defect, so v1.8.1 is justified as a
 maintenance release. Its scope is restricted to:
@@ -106,3 +106,16 @@ maintenance release. Its scope is restricted to:
 
 No new product feature, persistence schema, forecasting behavior or subsystem is
 in scope.
+
+Release-candidate evidence:
+
+- local release gate: 827 tests passed; Ruff, strict mypy, compileall and
+  `git diff --check` passed;
+- version authority reported 1.8.1 in uv-run, editable and isolated uv-tool
+  modes;
+- installed v1.8.1 Doctor reported `Overall: healthy`;
+- physical GNOME/Wayland login validation passed with the Codex executable
+  discovery fix;
+- hosted CI run `31888631324` succeeded on exact commit
+  `b449eec205c5a485b15c6f6ef335d3d330caabdb` for Python 3.12, 3.13 and 3.14
+  plus isolated uv-tool version validation.

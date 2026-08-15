@@ -34,7 +34,7 @@ Release type: **production-readiness maintenance / bugfix**
 - [x] release-version mode validation reports 1.8.1 in uv-run, editable and uv-tool modes;
 - [x] installed v1.8.1 Doctor is healthy;
 - [x] physical GNOME/Wayland login tray/Open Details smoke passed with the executable-resolution fix;
-- [ ] exact release commit hosted CI is green.
+- [x] exact release commit hosted CI is green: run 31888631324 on `b449eec205c5a485b15c6f6ef335d3d330caabdb`.
 
 ## Release closure
 

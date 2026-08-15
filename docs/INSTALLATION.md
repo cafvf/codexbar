@@ -1,178 +1,85 @@
-# Installation, desktop integration, settings, history and uninstall
+# Installation and lifecycle
 
-CodexBar 1.3.0 is the current validated release.
+The **canonical public installation procedure** is maintained in the root
+[`README.md`](../README.md#installing-codexbar-on-ubuntu).
 
-CodexBar uses a user-local `uv tool` installation. The installed application does **not** depend on the
-source checkout after installation.
+This file intentionally does not duplicate the full command sequence. Keeping one
+installation authority avoids divergence between release instructions.
 
-## Prerequisites
+## Supported public path
 
-Required:
-- Linux;
-- local Codex installed and authenticated;
-- `uv` available on `PATH`;
-- `notify-send` for desktop alerts.
+The supported installation model is:
 
-On Debian/Ubuntu-family systems:
+1. Linux, with Ubuntu/GNOME as the validated physical target;
+2. a locally installed and authenticated Codex CLI/app-server;
+3. Python in the range declared by `pyproject.toml`;
+4. `uv` on `PATH`;
+5. a released CodexBar source tag;
+6. `./scripts/install.sh`, which installs a user-local `uv tool`.
+
+For the current validated release, follow the README and select `v1.8.0` before
+running the installer. Do not use `sudo pip` or install CodexBar into the system
+Python interpreter.
+
+## Verification
+
+After installation, the public verification path is:
 
 ```bash
-sudo apt update
-sudo apt install libnotify-bin
+CODEXBAR="$(uv tool dir --bin)/codexbar"
+
+"$CODEXBAR" desktop status
+"$CODEXBAR" doctor
+"$CODEXBAR" --diagnose-indicator
+"$CODEXBAR" --gui
 ```
 
-For the optional native Ayatana label/menu:
+`--diagnose-indicator` checks the optional native Ayatana path; physical tray
+rendering still requires a real desktop session.
+
+## Upgrade
+
+Select the desired released tag in the source checkout and rerun:
 
 ```bash
-sudo apt install python3-gi gir1.2-ayatanaappindicator3-0.1 gir1.2-gtk-3.0
-```
-
-PyGObject remains outside the uv-managed environment.
-
-## Install from a clone or release source tree
-
-```bash
-git clone https://github.com/cafvf/codexbar.git
-cd codexbar
 ./scripts/install.sh
 ```
 
-Equivalent manual commands:
+The installer replaces application code through `uv tool install --force`.
+Normal persistent user data is not intentionally removed by an upgrade.
 
-```bash
-uv tool install --force --with 'PySide6>=6.8' .
-"$(uv tool dir --bin)/codexbar" desktop install
-```
+## Uninstall and retained data
 
-## Verify
-
-```bash
-command -v notify-send
-"$(uv tool dir --bin)/codexbar" desktop status
-"$(uv tool dir --bin)/codexbar" --gui
-```
-
-Notification diagnostics from a source/release tree:
-
-```bash
-uv run python scripts/diagnose_notifications.py
-```
-
-History validation from a source/release tree:
-
-```bash
-uv run python scripts/validate_history.py all
-```
-
-## Settings
-
-Tray Settings controls:
-- LOW remaining threshold — default `0.20`, valid `0 < threshold < 1`;
-- refresh interval — default `60` seconds, valid `10..3600`;
-- notifications enabled — default `true`.
-
-Notifications emit transition-based LOW/EXHAUSTED desktop notifications. Repeated unchanged constrained
-states are deduplicated.
-
-CLI:
-
-```bash
-"$(uv tool dir --bin)/codexbar" settings show
-"$(uv tool dir --bin)/codexbar" settings reset
-```
-
-Settings remain schema-v1 JSON under the canonical host-user XDG config location.
-
-## Usage history
-
-The v1.3 implementation persists normalized CURRENT usage observations to schema-v1 SQLite.
-
-History path:
-
-```text
-$XDG_DATA_HOME/codexbar/history.sqlite3
-```
-
-Fallback:
-
-```text
-$HOME/.local/share/codexbar/history.sqlite3
-```
-
-An `XDG_DATA_HOME` located below `$HOME/snap/` is rejected in favor of the host-user fallback.
-
-Inspect:
-
-```bash
-"$(uv tool dir --bin)/codexbar" history inspect
-```
-
-Possible states:
-- `absent`;
-- `ready_empty`;
-- `ready_non_empty`;
-- `unreadable`;
-- `unsupported`.
-
-Inspection is non-destructive. Inspecting an absent history path does not create a database.
-
-Clear stored observations:
-
-```bash
-"$(uv tool dir --bin)/codexbar" history clear
-```
-
-`history clear`:
-- preserves the valid schema;
-- is idempotent;
-- succeeds when history is absent/already empty;
-- does not modify settings or current runtime state;
-- refuses corrupt/unsupported storage instead of replacing it.
-
-Retention is fixed at 30 days in v1.3. Every eligible CURRENT observation is offered to history; STALE
-fallback and provider errors do not create new observations.
-
-History data is intentionally retained independently of desktop integration and tool uninstall. If the user
-wants to remove observations, run `history clear` before uninstall or remove the history database explicitly
-after the application is no longer running.
-
-## Autostart
-
-```bash
-"$(uv tool dir --bin)/codexbar" desktop autostart enable
-"$(uv tool dir --bin)/codexbar" desktop autostart disable
-```
-
-## Native indicator diagnostics
-
-```bash
-"$(uv tool dir --bin)/codexbar" --diagnose-indicator
-```
-
-The Ayatana helper remains isolated in system Python. Native indicator failure falls back to the Qt tray.
-
-## Uninstall
+With the source checkout:
 
 ```bash
 ./scripts/uninstall.sh
 ```
 
-or, without the checkout:
+Without it:
 
 ```bash
 "$(uv tool dir --bin)/codexbar" desktop uninstall
 uv tool uninstall codexbar
 ```
 
-Persistent settings and history are user data and are not removed by desktop integration cleanup.
+Uninstall removes the installed application and desktop integration but
+intentionally **preserves user data**. In particular, settings, usage History,
+and the reset event ledger are not silently destroyed.
 
-## Development/release gate
+To remove retained History deliberately:
 
 ```bash
-uv sync --extra dev --extra gui --extra native-indicator
-uv run pytest -ra
-uv run ruff check src tests scripts
-uv run mypy
-uv run python -m compileall -q src scripts
+"$(uv tool dir --bin)/codexbar" history clear
 ```
 
-`uv.lock` is versioned for reproducibility.
+For a complete local-data purge, first stop CodexBar and inspect the exact
+CodexBar-specific paths reported by its diagnostics/inspection commands. Remove
+only CodexBar-specific files or directories; never delete broad XDG roots such as
+`~/.config` or `~/.local/share`.
+
+## Development setup
+
+Development dependencies and release gates are documented separately in the
+README and `docs/GIT_WORKFLOW.md`. Development setup is not part of the public
+installation contract.

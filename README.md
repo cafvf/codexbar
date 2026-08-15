@@ -3,7 +3,7 @@
 CodexBar is a Linux tray application for monitoring Codex usage, retaining bounded observational history, and exposing explicit reset-credit control when the local Codex app-server provides that capability.
 
 Current validated release: **1.8.0 — Plan**.
-Next roadmap item: **v1.9 — Explore**.
+Feature development is currently frozen while CodexBar is productized for broader public use. No v1.9 feature scope is committed; maintenance and production-readiness work take precedence.
 
 ## What CodexBar does
 
@@ -60,6 +60,8 @@ notify-send --version
 ```
 
 ## Installing CodexBar on Ubuntu
+
+This section is the **canonical public installation contract** for CodexBar. `docs/INSTALLATION.md` intentionally points back here instead of maintaining a second, divergent procedure.
 
 CodexBar uses a **user-local `uv tool` installation**. Do not use `sudo pip`,
 `sudo uv`, or install the Python package into the system interpreter.
@@ -182,12 +184,15 @@ Or remove the desktop integration and tool explicitly:
 uv tool uninstall codexbar
 ```
 
-Application uninstall does not silently delete persistent user data. Clear
-History explicitly first if you also want to remove retained usage observations:
+Application uninstall does not silently delete persistent user data. It preserves settings, usage History, and the reset event ledger unless the user explicitly removes them.
+
+Clear History before uninstall if you want to remove retained usage observations:
 
 ```bash
 "$(uv tool dir --bin)/codexbar" history clear
 ```
+
+After CodexBar is no longer running, a user who explicitly wants a full local-data purge may remove the CodexBar-specific files/directories under the canonical host-user XDG locations documented by `codexbar doctor` / `history inspect`. Do not delete broad `~/.config` or `~/.local/share` directories.
 
 ## Daily use
 
@@ -445,6 +450,8 @@ Release-specific documents:
 - `docs/FUTURE-TASKS.md` — deferred maintenance.
 
 ## Security and semantic boundaries
+
+See [`SECURITY.md`](SECURITY.md) for vulnerability reporting and repository security expectations.
 
 CodexBar does not manage Codex credentials.
 

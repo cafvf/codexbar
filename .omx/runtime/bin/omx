@@ -1,2 +1,0 @@
-#!/bin/sh
-exec '/home/christiano/.nvm/versions/node/v24.18.0/bin/node' '/home/christiano/.nvm/versions/node/v24.18.0/lib/node_modules/oh-my-codex/dist/cli/omx.js' "$@"

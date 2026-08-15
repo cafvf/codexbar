@@ -1,12 +1,15 @@
 from __future__ import annotations
 
 import json
+import os
 import selectors
+import shutil
 import subprocess
 import time
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from datetime import UTC, datetime
 from decimal import Decimal, InvalidOperation
+from pathlib import Path
 from typing import Any, Protocol, TextIO, cast
 
 from codexbar import __version__
@@ -22,6 +25,56 @@ from codexbar.domain.models import Fraction, UsageSnapshot, UsageSource, UsageWi
 JsonObject = dict[str, Any]
 
 
+def _is_executable_file(path: Path) -> bool:
+    return path.is_file() and os.access(path, os.X_OK)
+
+
+def _nvm_version_key(path: Path) -> tuple[int, ...]:
+    raw = path.parent.parent.name.removeprefix("v")
+    try:
+        return tuple(int(part) for part in raw.split("."))
+    except ValueError:
+        return (-1,)
+
+
+def resolve_codex_executable(
+    *,
+    env: Mapping[str, str] | None = None,
+) -> str:
+    """Resolve Codex without depending on interactive-shell initialization."""
+
+    values = os.environ if env is None else env
+
+    found = shutil.which("codex", path=values.get("PATH", ""))
+    if found is not None:
+        return found
+
+    home = Path(values.get("HOME", str(Path.home()))).expanduser()
+
+    local_candidate = home / ".local/bin/codex"
+    if _is_executable_file(local_candidate):
+        return str(local_candidate)
+
+    nvm_root = Path(values.get("NVM_DIR", str(home / ".nvm"))).expanduser()
+    nvm_candidates = [
+        candidate
+        for candidate in (nvm_root / "versions/node").glob("*/bin/codex")
+        if _is_executable_file(candidate)
+    ]
+    if nvm_candidates:
+        selected = max(
+            nvm_candidates,
+            key=lambda candidate: (_nvm_version_key(candidate), str(candidate)),
+        )
+        return str(selected)
+
+    npm_global_candidate = home / ".npm-global/bin/codex"
+    if _is_executable_file(npm_global_candidate):
+        return str(npm_global_candidate)
+
+    return "codex"
+
+
 class JsonRpcTransport(Protocol):
     def send(self, message: JsonObject) -> None: ...
 
@@ -34,18 +87,35 @@ class SubprocessJsonRpcTransport:
     """JSONL transport for the stable `codex app-server --stdio` interface."""
 
     def __init__(self, executable: str = "codex") -> None:
+        resolved_executable = (
+            resolve_codex_executable() if executable == "codex" else executable
+        )
+        process_env = dict(os.environ)
+        resolved_path = Path(resolved_executable)
+        if resolved_path.is_absolute():
+            executable_dir = str(resolved_path.parent)
+            current_path = process_env.get("PATH", "")
+            path_parts = current_path.split(os.pathsep) if current_path else []
+            if executable_dir not in path_parts:
+                process_env["PATH"] = os.pathsep.join(
+                    [executable_dir, *path_parts]
+                )
+
         try:
             self._process = subprocess.Popen(
-                [executable, "app-server", "--stdio"],
+                [resolved_executable, "app-server", "--stdio"],
                 stdin=subprocess.PIPE,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
                 text=True,
                 encoding="utf-8",
                 bufsize=1,
+                env=process_env,
             )
         except FileNotFoundError as exc:
-            raise UsageSourceUnavailableError(f"Codex executable not found: {executable}") from exc
+            raise UsageSourceUnavailableError(
+                f"Codex executable not found: {resolved_executable}"
+            ) from exc
         except OSError as exc:
             raise UsageSourceUnavailableError(f"Could not start Codex app-server: {exc}") from exc
 

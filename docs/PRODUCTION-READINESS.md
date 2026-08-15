@@ -1,6 +1,6 @@
 # CodexBar Production Readiness
 
-Status: **Phases A and B applied; Phases C and D pending**
+Status: **Phases A, B and C complete; Phase D in progress**
 
 Audited baseline: `c24639e811bd0507020e3fb6b4757f2849e6ae0c`
 Validated product release: **v1.8.0 — Plan**
@@ -54,13 +54,55 @@ the reviewed historical values are not service secrets.
 
 ## Phase C — Clean-room Validation
 
-Pending. This phase must validate a fresh-user installation from public
-documentation only, including install, first run, diagnostics, GUI/tray,
-login/restart behavior, upgrade, and uninstall.
+Complete.
+
+- [x] clean-room checkout installed v1.8.0 through the documented installation
+      path on Ubuntu/GNOME/Wayland.
+- [x] upgrade from a real pre-1.0 installation preserved persisted Settings,
+      History and reset-ledger state.
+- [x] post-upgrade Doctor reported `Overall: healthy`; the Codex app-server
+      source, Current read, Qt fallback and native-indicator diagnostic path
+      remained available.
+- [x] physical tray, Current, Open Details, History, Historical Context,
+      Settings, System Health and Plan surfaces were exercised successfully.
+- [x] a fresh CodexBar application state initialized from defaults without
+      existing CodexBar persistence and created the expected History and
+      reset-ledger stores.
+- [x] the fresh-state test was isolated from the user's real persistence, and
+      the original state was restored successfully afterward.
+- [x] reinstall over v1.8.0 was idempotent and preserved persisted data.
+- [x] uninstall removed the tool, launcher and managed desktop integration while
+      preserving Settings, History and reset-ledger data.
+- [x] final reinstall restored a healthy installation using the preserved data.
+- [x] real session-login validation discovered a production defect: the
+      graphical-session environment did not expose an NVM-installed `codex`
+      executable through `PATH`, so the autostarted GUI could not reach the
+      Codex app-server.
+- [x] the defect was reproduced and characterized: the interactive Codex
+      executable was under `~/.nvm/versions/node/.../bin/codex` and used
+      `#!/usr/bin/env node`.
+- [x] a regression fix added shell-independent user-local Codex discovery and
+      confined PATH augmentation to the spawned app-server subprocess.
+- [x] the regression fix passed 827 tests, Ruff, strict mypy, compileall and
+      `git diff --check`.
+- [x] repeated physical GNOME/Wayland login after installing the fix succeeded:
+      the tray initialized normally and Current/Open Details accessed Codex
+      without the previous executable-not-found error.
+
+The login defect is the concrete maintenance reason for v1.8.1. No feature or
+schema expansion resulted from Phase C.
 
 ## Phase D — Maintenance Release
 
-Pending. Only after Phase C closes should release metadata be advanced and a
-maintenance release such as v1.8.1 be considered. Phase D should contain no new
-functional scope unless a concrete defect discovered during Phase C requires a
-fix.
+In progress.
+
+Phase C produced one concrete production defect, so v1.8.1 is justified as a
+maintenance release. Its scope is restricted to:
+
+- robust shell-independent discovery of a locally installed Codex executable
+  for desktop/session launches;
+- regression coverage for minimal graphical-session PATH environments;
+- release metadata and production-readiness evidence.
+
+No new product feature, persistence schema, forecasting behavior or subsystem is
+in scope.

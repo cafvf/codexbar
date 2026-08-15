@@ -3,7 +3,7 @@ from __future__ import annotations
 import tomllib
 from pathlib import Path
 
-EXPECTED_VERSION = "1.8.0"
+EXPECTED_VERSION = "1.8.1"
 
 
 def _read(path: str) -> str:
@@ -44,7 +44,8 @@ def test_v18_release_documents_are_present_and_identify_plan() -> None:
         assert "Plan" in text
 
     changelog = _read("CHANGELOG.md")
-    assert changelog.startswith("# Changelog\n\n## 1.8.0")
+    assert changelog.startswith("# Changelog\n\n## 1.8.1")
+    assert "## 1.8.0 — 2026-08-14" in changelog
     assert "Validated **Plan** release." in changelog
 
 

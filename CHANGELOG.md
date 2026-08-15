@@ -1,5 +1,51 @@
 # Changelog
 
+## 1.8.1 — 2026-08-15
+
+Production-readiness maintenance release.
+
+### Fixed
+- Codex CLI discovery for desktop/session launches whose inherited `PATH` does
+  not contain the user's Codex installation;
+- user-local Codex resolution now checks the active `PATH`, `~/.local/bin`,
+  installed NVM Node versions, and `~/.npm-global/bin` without loading shell
+  startup files;
+- when an absolute Codex executable is resolved, its containing directory is
+  prepended only to the spawned Codex app-server subprocess environment, so
+  NVM-installed `codex` launchers using `#!/usr/bin/env node` can resolve their
+  associated Node runtime.
+
+### Compatibility and safety
+- no Current, History, Historical Context, Budget, Plan, reset-credit or redeem
+  semantics change;
+- no settings, History or reset-ledger schema change;
+- no `.bashrc`, `.profile`, `nvm.sh` or arbitrary shell initialization is
+  executed;
+- the desktop entry remains a direct CodexBar launch and does not become
+  shell-dependent;
+- explicit Codex executable injection remains supported by the existing
+  app-server transport boundary.
+
+### Production-readiness validation
+- upgrade from an existing v0.2.0 installation to v1.8.0 preserved Settings,
+  History and reset-ledger data;
+- fresh CodexBar state initialized successfully with default Settings, one
+  initial History snapshot and one reset-ledger event;
+- reinstall over v1.8.0 was idempotent;
+- uninstall removed the application and desktop integration while preserving
+  persistent user data;
+- final reinstall restored a healthy application with existing data intact;
+- first real GNOME/Wayland login with autostart exposed a Codex executable
+  discovery defect when Codex was installed under NVM and absent from the
+  graphical-session `PATH`;
+- regression fix passed 827 tests plus Ruff, strict mypy, compileall and
+  `git diff --check`;
+- repeated physical GNOME/Wayland login after the fix successfully started the
+  tray application and Current/Open Details accessed the local Codex source
+  without error.
+
+Final release-gate and hosted-CI evidence will be recorded before tagging.
+
 ## 1.8.0 — 2026-08-14
 
 Validated **Plan** release.
